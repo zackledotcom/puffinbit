@@ -1,0 +1,168 @@
+import React, { useState, useEffect } from 'react'
+
+interface Message {
+  type: 'user' | 'ai'
+  content: string
+  timestamp: Date
+}
+
+const SimpleAIAssistant: React.FC = () => {
+  const [messages, setMessages] = useState<Message[]>([
+    { type: 'ai', content: "Hello. How can I assist you?", timestamp: new Date() }
+  ])
+  const [currentMessage, setCurrentMessage] = useState('')
+  const [isThinking, setIsThinking] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('tinydolphin:latest')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+
+  const [ollamaConnected, setOllamaConnected] = useState(false)
+
+  useEffect(() => {
+    const checkOllama = async () => {
+      try {
+        const response = await window.api.checkOllamaStatus()
+        setOllamaConnected(response.connected)
+        if (response.models) {
+          setAvailableModels(response.models)
+        }
+      } catch (error) {
+        setOllamaConnected(false)
+      }
+    }
+    
+    checkOllama()
+    const interval = setInterval(checkOllama, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleSendMessage = async () => {
+    if (!currentMessage.trim() || isThinking) return
+
+    const userMsg: Message = { type: 'user', content: currentMessage, timestamp: new Date() }
+    setMessages(prev => [...prev, userMsg])
+    setCurrentMessage('')
+    setIsThinking(true)
+
+    try {
+      const response = await window.api.chatWithAI({
+        message: currentMessage,
+        model: selectedModel,
+        history: messages.slice(-5)
+      })
+
+      const aiMsg: Message = { 
+        type: 'ai', 
+        content: response.message || 'I apologize, but I encountered an error.',
+        timestamp: new Date() 
+      }
+      setMessages(prev => [...prev, aiMsg])
+    } catch (error) {
+      const errorMsg: Message = { 
+        type: 'ai', 
+        content: 'I apologize, but I encountered an error. Please try again.',
+        timestamp: new Date() 
+      }
+      setMessages(prev => [...prev, errorMsg])
+    } finally {
+      setIsThinking(false)
+    }
+  }
+
+  return (
+    <div style={{ height: '100vh', backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ fontSize: '20px', margin: 0 }}>Puffer</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: ollamaConnected ? '#22c55e' : '#ef4444' }}></div>
+          <select 
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            style={{ backgroundColor: '#1f1f1f', color: 'white', border: '1px solid #333', borderRadius: '4px', padding: '4px 8px' }}
+          >
+            {availableModels.map(model => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        {messages.map((message, index) => (
+          <div key={index} style={{ marginBottom: '24px', display: 'flex', justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{ maxWidth: '70%' }}>
+              <div style={{
+                backgroundColor: message.type === 'user' ? '#2a2a2a' : '#1a1a1a',
+                border: message.type === 'ai' ? '1px solid #333' : 'none',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '4px'
+              }}>
+                <p style={{ margin: 0, lineHeight: '1.5' }}>{message.content}</p>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                {message.timestamp.toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+        ))}
+        
+        {isThinking && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#666' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: 'currentColor', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: 'currentColor', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.2s' }}></div>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: 'currentColor', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.4s' }}></div>
+                </div>
+                <span style={{ fontSize: '14px' }}>Thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: '24px', borderTop: '1px solid #333' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <input
+            type="text"
+            value={currentMessage}
+            onChange={(e) => setCurrentMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder="Message Puffer..."
+            disabled={isThinking || !ollamaConnected}
+            style={{
+              flex: 1,
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333',
+              borderRadius: '8px',
+              padding: '12px',
+              color: 'white',
+              fontSize: '14px'
+            }}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!currentMessage.trim() || isThinking || !ollamaConnected}
+            style={{
+              backgroundColor: 'white',
+              color: 'black',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default SimpleAIAssistant

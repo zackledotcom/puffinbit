@@ -1,0 +1,183 @@
+/* Magic UI Animations for Puffin AI Chat Interface */
+
+/* Shimmer Animation */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Aurora Animation */
+@keyframes aurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Ripple Animation */
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* Pulse Animation */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Gradient Animation */
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Glow Animation */
+@keyframes glow {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(147, 51, 234, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.8), 
+                0 0 30px rgba(147, 51, 234, 0.6);
+  }
+}
+
+/* Typing Animation */
+@keyframes typing {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
+
+/* Fade In Up Animation */
+@keyframes fadeInUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+/* Scale In Animation */
+@keyframes scaleIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.8); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+/* Slide In Right Animation */
+@keyframes slideInRight {
+  from { 
+    opacity: 0; 
+    transform: translateX(30px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0); 
+  }
+}
+
+/* Bounce In Animation */
+@keyframes bounceIn {
+  0% { 
+    transform: scale(0.3); 
+    opacity: 0; 
+  }
+  50% { 
+    transform: scale(1.05); 
+    opacity: 1; 
+  }
+  70% { 
+    transform: scale(0.9); 
+  }
+  100% { 
+    transform: scale(1); 
+  }
+}
+
+/* Apply animations */
+.animate-shimmer { animation: shimmer 2s infinite; }
+.animate-aurora { animation: aurora 3s ease-in-out infinite; }
+.animate-ripple { animation: ripple 0.6s linear; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-gradient { animation: gradient 3s ease infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+.animate-fadeInUp { animation: fadeInUp 0.6s ease-out; }
+.animate-scaleIn { animation: scaleIn 0.4s ease-out; }
+.animate-slideInRight { animation: slideInRight 0.5s ease-out; }
+.animate-bounceIn { animation: bounceIn 0.6s ease-out; }
+
+/* Glassmorphism utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.7);
+}
+
+/* Magic UI specific classes */
+.magic-text-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.magic-border-gradient {
+  position: relative;
+  background: linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Responsive design utilities */
+@media (max-width: 640px) {
+  .animate-shimmer { animation-duration: 1.5s; }
+  .animate-aurora { animation-duration: 2s; }
+}
+
+/* Performance optimizations */
+.will-change-transform { will-change: transform; }
+.will-change-opacity { will-change: opacity; }
+.gpu-accelerated { 
+  transform: translateZ(0); 
+  backface-visibility: hidden; 
+}
