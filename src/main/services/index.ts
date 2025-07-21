@@ -52,12 +52,28 @@ export * from './chromaService'
 
 // Other existing services
 export * from './avatarService'
-export * from './codeGenerationService'
 export * from './crypto'
-export * from './database'
-export * from './geminiMemory'
-export * from './gemmaCoderService'
 export * from './memoryService'
 export * from './modelTuningService'
 export * from './reddit'
 export * from './redditAgent'
+
+// Selective exports to avoid conflicts
+export { 
+  type MemorySearchResult as DatabaseMemorySearchResult 
+} from './database'
+
+export { 
+  geminiMemoryService,
+  type MemorySearchResult as GeminiMemorySearchResult 
+} from './geminiMemory'
+
+export { 
+  generateCodeWithGemma,
+  completeCode as completeCodeWithGemma 
+} from './gemmaCoderService'
+
+export { 
+  generateCode,
+  completeCode as completeCodeGeneric 
+} from './codeGenerationService'

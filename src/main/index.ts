@@ -23,6 +23,8 @@ import { mcpService } from '@services/mcpService'
 import { registerContextMenuHandlers } from '@main/handlers/contextMenuHandlers'
 import '@main/mcp-handlers' // Import MCP handlers
 import '@main/reddit-bot-handlers' // Import Reddit bot handlers
+import './canvas-handlers' // Import canvas file system handlers
+import './handlers/assistant-ui-handlers' // Import Assistant UI handlers
 
 import {
   loadSettings,

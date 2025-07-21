@@ -133,7 +133,7 @@ export class ChatProcessor {
 
       return {
         success: true,
-        response: ollamaResponse.response,
+        message: ollamaResponse.response,
         modelUsed: request.model,
         responseTime,
         memoryUsed

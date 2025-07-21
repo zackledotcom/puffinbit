@@ -1,32 +1,15 @@
-// Enhanced Puffin Canvas 3D System
-// 10x better than Pelicanos with Magic UI and Three.js integration
+// ChatGPT-Style Canvas Implementation
+// Main Canvas Panel for side-by-side IDE experience
 
-// Main Canvas Component
-export { default as PuffinCanvas3D } from './PuffinCanvas3D';
+// Primary Canvas Component
+export { default as CanvasPanel } from './CanvasPanel';
 
-// Core Components
-export { MagicUIProvider, useMagicUI } from './core/MagicUIProvider';
-export { InteractiveWorkspace } from './core/InteractiveWorkspace';
+// Monaco Editor Integration
+export { default as MonacoCanvasEditor } from './MonacoCanvasEditor';
 
-// Spatial Components
-export { SpatialChatSystem } from './spatial/SpatialChatSystem';
-export { AIAssistantAvatar } from './spatial/AIAssistantAvatar';
-export { CollaborationLayer } from './spatial/CollaborationLayer';
-
-// Editor Components
-export { SmartCodeEditor } from './editors/SmartCodeEditor';
-
-// Effect Components
-export { LightingSystem } from './effects/LightingSystem';
-export { ParticleSystem } from './effects/ParticleSystem';
-
-// UI Components
-export { FloatingPanels } from './ui/FloatingPanels';
-
-// Magic UI Components
-export { Marquee } from '../magicui/marquee';
-export { TextReveal } from '../magicui/text-reveal';
-export { BoxReveal } from '../magicui/box-reveal';
+// Legacy Components (deprecated - use CanvasPanel instead)
+export { default as CodeCanvas } from './CodeCanvas';
+export { default as CanvasView } from './CanvasView';
 
 // Types
 export interface CanvasMessage {

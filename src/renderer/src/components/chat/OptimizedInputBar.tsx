@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { useCanvasStore } from '@/stores/canvasStore'
 
 interface OptimizedInputBarProps {
   value: string
@@ -73,6 +74,7 @@ export default function OptimizedInputBar({
   const [showMemorySearch, setShowMemorySearch] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { canvasOpen } = useCanvasStore()
 
   // Smart tool detection
   const containsCode = (text: string) => {
@@ -112,14 +114,14 @@ export default function OptimizedInputBar({
     }
     
     // Canvas tool - show if code detected or already active
-    if (containsCode(value) || canvasActive) {
+    if (containsCode(value) || canvasOpen) {
       tools.push({
         id: 'canvas',
-        icon: Lightning,
-        label: canvasActive ? 'Canvas: Active' : 'Open Canvas',
-        active: canvasActive,
+        icon: Code,
+        label: canvasOpen ? 'Canvas: Active' : 'Open Canvas',
+        active: canvasOpen,
         onClick: onOpenCanvas,
-        color: canvasActive ? 'text-purple-600 bg-purple-50' : 'text-gray-600'
+        color: canvasOpen ? 'text-purple-600 bg-purple-50' : 'text-gray-600'
       })
     }
     

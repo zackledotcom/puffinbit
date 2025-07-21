@@ -119,7 +119,7 @@ class AvatarService {
       const avatarPath = path.join(this.avatarsDir, fileName)
 
       // Save the file
-      await fs.writeFile(avatarPath, imageBuffer)
+      await fs.writeFile(avatarPath, new Uint8Array(imageBuffer))
 
       // Update avatar config
       const existingIndex = this.avatarsConfig.findIndex((config) => config.modelName === modelName)

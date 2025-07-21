@@ -58,11 +58,11 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const handleFileChange = () => {}
 
   return (
-    <aside className="w-72 min-w-[288px] max-w-xs h-full bg-white/70 border-r border-muted/40 backdrop-blur-md flex flex-col shadow-sm transition-all duration-300">
+    <aside className="w-72 min-w-[288px] max-w-xs h-full bg-black flex flex-col border-r border-gray-800">
       {/* Top section: Avatar + Name */}
-      <div className="flex items-center gap-3 px-6 pt-7 pb-5 border-b border-muted/30 bg-white/40 backdrop-blur-md">
+      <div className="flex items-center gap-3 px-6 py-5 bg-gray-900">
         <div className="relative">
-          <div className="w-12 h-12 rounded-full border border-muted/50 bg-white/60 flex items-center justify-center overflow-hidden shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
             {user.avatarUrl ? (
               <img
                 src={user.avatarUrl}
@@ -76,7 +76,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -bottom-1 -right-1 p-1 h-6 w-6 rounded-full bg-white/80 border border-muted/40 shadow-sm hover:bg-gray-100/70 transition-all"
+            className="absolute -bottom-1 -right-1 p-1 h-5 w-5 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
             aria-label="Change profile picture"
             onClick={handleAvatarClick}
             tabIndex={0}
@@ -92,65 +92,60 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
           />
         </div>
         <div className="flex flex-col justify-center">
-          <span className="text-[1.35rem] font-semibold text-gray-900 leading-tight tracking-tight font-sans" style={{ fontWeight: 600 }}>
+          <span className="text-base font-medium text-white leading-tight tracking-tight">
             {user.name}
           </span>
         </div>
       </div>
 
       {/* Flat, stacked sections */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto px-4 py-4 space-y-6">
         {/* Model Selector */}
         <section className="px-6 pt-8 pb-0">
-          <label className="block text-xs font-medium text-gray-500 mb-2 tracking-wide font-sans" style={{ fontWeight: 500 }}>
-            Model
-          </label>
-          <div className="rounded-xl border border-muted/30 bg-white/60 shadow-sm hover:shadow-md transition-all duration-200 flex items-center px-3 py-[13px] gap-3">
-            <Monitor size={20} className="text-gray-400" weight="thin" />
-            <select
-              value={selectedModel}
-              onChange={e => onModelChange(e.target.value)}
-              className="flex-1 bg-transparent focus:outline-none text-base font-semibold text-gray-900 font-sans pr-2"
-              style={{ fontWeight: 600 }}
-              aria-label="Select model"
-            >
-              {availableModels.map(model =>
-                <option key={model} value={model}>{formatModelName(model)}</option>
-              )}
-            </select>
+          <div>
+            <div className="text-xs font-medium text-gray-400 mb-2">Model</div>
+            <div className="rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors flex items-center px-3 py-2 gap-2">
+              <Monitor size={16} className="text-gray-400" weight="light" />
+              <select
+                value={selectedModel}
+                onChange={e => onModelChange(e.target.value)}
+                className="flex-1 bg-transparent focus:outline-none text-sm text-white py-1 pr-2 appearance-none"
+                aria-label="Select model"
+              >
+                {availableModels.map(model =>
+                  <option key={model} value={model} className="bg-gray-900 text-white">
+                    {formatModelName(model)}
+                  </option>
+                )}
+              </select>
+            </div>
           </div>
         </section>
 
         {/* Recent Chats */}
         <section className="px-6 pt-8 pb-0">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-500 tracking-wide font-sans" style={{ fontWeight: 500 }}>
-              Recent Chats
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 p-0 rounded-full hover:bg-gray-100/70 transition-all"
+            <span className="text-xs font-medium text-gray-400">Recent Chats</span>
+            <button
               onClick={onNewChat}
+              className="p-1.5 rounded-md hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
               aria-label="New chat"
             >
-              <Plus size={16} className="text-gray-500" weight="thin" />
-            </Button>
+              <Plus size={16} weight="light" />
+            </button>
           </div>
           <div className="flex flex-col gap-2">
             {recentChats.map(chat => (
               <div
                 key={chat.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all cursor-pointer group"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
               >
-                <ChatCircle size={18} className="text-gray-300 flex-shrink-0" weight="thin" />
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-sm font-medium text-gray-900 truncate font-sans" style={{ fontWeight: 500 }}>
-                    {chat.title}
-                  </span>
-                  <span className="text-xs text-gray-400 font-sans mt-1" style={{ fontWeight: 400 }}>
+                <ChatCircle size={16} className="text-gray-400 flex-shrink-0" weight="light" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-white truncate">{chat.title}</div>
+                  <div className="text-xs text-gray-400">
                     {formatRelativeTime(chat.timestamp)} &middot; {chat.messageCount} messages
-                  </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -158,45 +153,39 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         </section>
 
         {/* Memory Tools (Placeholder for future, minimal) */}
-        <section className="px-6 pt-8 pb-0">
-          <span className="block text-xs font-medium text-gray-500 mb-2 tracking-wide font-sans" style={{ fontWeight: 500 }}>
-            Memory Tools
-          </span>
-          <div className="rounded-lg border border-muted/30 bg-white/50 px-3 py-2 text-xs text-gray-400 font-sans">
-            <span>Coming soon: persistent memory tools</span>
+        <section>
+          <div className="text-xs font-medium text-gray-400 mb-2">Memory</div>
+          <div className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-gray-400">
+            Coming soon
           </div>
         </section>
       </div>
 
       {/* Footer: Settings, Theme */}
-      <footer className="px-6 pt-8 pb-7 border-t border-muted/30 bg-white/40 backdrop-blur-md">
+      <footer className="px-4 py-3 border-t border-gray-800 bg-gray-900">
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 p-0 rounded-full hover:bg-gray-100/70 transition-all"
+          <button
             onClick={onOpenSettings}
+            className="p-1.5 rounded-md hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
             aria-label="Settings"
           >
-            <Gear size={16} className="text-gray-500" weight="thin" />
-          </Button>
-          <div className="flex items-center gap-2">
+            <Gear size={18} weight="light" />
+          </button>
+          <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-md">
             {(['light', 'dark', 'system'] as const).map((t) => (
-              <Button
+              <button
                 key={t}
-                variant="ghost"
-                size="icon"
                 onClick={() => onThemeChange(t)}
                 className={cn(
-                  'h-7 w-7 p-0 rounded-full transition-all',
-                  theme === t ? 'bg-gray-100 shadow-sm' : 'hover:bg-gray-100/70'
+                  'p-1.5 rounded-md transition-colors',
+                  theme === t ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                 )}
                 aria-label={`${t} theme`}
               >
-                {t === 'light' && <Sun size={13} className={theme === t ? "text-yellow-500" : "text-gray-400"} weight="thin" />}
-                {t === 'dark' && <Moon size={13} className={theme === t ? "text-blue-600" : "text-gray-400"} weight="thin" />}
-                {t === 'system' && <Monitor size={13} className={theme === t ? "text-purple-600" : "text-gray-400"} weight="thin" />}
-              </Button>
+                {t === 'light' && <Sun size={14} weight="light" />}
+                {t === 'dark' && <Moon size={14} weight="light" />}
+                {t === 'system' && <Monitor size={14} weight="light" />}
+              </button>
             ))}
           </div>
         </div>

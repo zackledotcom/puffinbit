@@ -8,6 +8,8 @@ import OptimizedInputBar from './OptimizedInputBar'
 import OptimizedHeader from '../layout/OptimizedHeader'
 import { useAnalyticsTracking } from '../../services/modelAnalytics'
 import { useToast } from '@/components/ui/toast'
+import { useCanvasStore } from '@/stores/canvasStore'
+import CanvasPanel from '../canvas/CanvasPanel'
 
 interface OptimizedChatInterfaceProps {
   selectedModel: string
@@ -41,7 +43,7 @@ const OptimizedChatInterface: React.FC<OptimizedChatInterfaceProps> = ({
   const [responseTime, setResponseTime] = useState(0)
   const [selectedMemoryContext, setSelectedMemoryContext] = useState<any[]>([])
   const [memoryEnabled, setMemoryEnabled] = useState(true)
-  const [canvasActive, setCanvasActive] = useState(false)
+  const { canvasOpen, setCanvasOpen } = useCanvasStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const services = useAllServices()
@@ -240,11 +242,11 @@ const OptimizedChatInterface: React.FC<OptimizedChatInterfaceProps> = ({
   }
 
   const handleOpenCanvas = () => {
-    setCanvasActive(!canvasActive)
+    setCanvasOpen(!canvasOpen)
     addToast({
       type: 'info',
-      title: canvasActive ? 'Canvas Closed' : 'Canvas Opened',
-      description: canvasActive ? 'Returned to chat mode' : 'Code canvas activated',
+      title: canvasOpen ? 'Canvas Closed' : 'Canvas Opened',
+      description: canvasOpen ? 'Returned to chat mode' : 'Code canvas activated',
       duration: 2000
     })
   }
@@ -267,9 +269,11 @@ const OptimizedChatInterface: React.FC<OptimizedChatInterfaceProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Optimized Header */}
-      <OptimizedHeader
+    <div className="flex h-screen bg-white">
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Optimized Header */}
+        <OptimizedHeader
         selectedModel={selectedModel}
         modelStatus={getModelStatus()}
         messageCount={messageCount}
@@ -359,11 +363,15 @@ const OptimizedChatInterface: React.FC<OptimizedChatInterfaceProps> = ({
           selectedMemoryContext={selectedMemoryContext}
           memoryEnabled={memoryEnabled}
           onOpenCanvas={handleOpenCanvas}
-          canvasActive={canvasActive}
+          canvasActive={canvasOpen}
           onExportChat={handleExportChat}
           hasMessages={messages.length > 0}
         />
+        </div>
       </div>
+
+      {/* Canvas Panel */}
+      <CanvasPanel />
     </div>
   )
 }

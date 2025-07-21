@@ -1,5 +1,11 @@
 import './globals.css'
+import './styles/magic-ui.css'
 import './styles/chat-enhancements.css'
+
+// Assistant UI styles - DISABLED for PremiumChatInterface
+// import '@assistant-ui/styles/index.css'
+// import '@assistant-ui/styles/modal.css'
+// import '@assistant-ui/styles/markdown.css'
 
 import React from 'react'
 import { createRoot } from 'react-dom/client'

@@ -70,7 +70,9 @@ export default function ModelHealthMonitor({
       case 'critical': return '#ef4444'
       default: return '#6b7280'
     }
-  }  const getStatusIcon = (status: ModelHealth['status']) => {
+  }
+  
+  const getStatusIcon = (status: ModelHealth['status']) => {
     switch (status) {
       case 'excellent':
       case 'good':
@@ -101,7 +103,9 @@ export default function ModelHealthMonitor({
       setIsRefreshing(false)
       onRefresh?.()
     }, 1000)
-  }  return (
+  }
+  
+  return (
     <TooltipProvider>
       <Card className={`glass-panel border-0 ${className}`}>
         <CardHeader className="pb-3">

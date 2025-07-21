@@ -203,7 +203,7 @@ const ModelTuner: React.FC<ModelTunerProps> = ({ className }) => {
         <CardTitle className="flex items-center gap-2 text-white">
           <Brain size={20} className="text-purple-400" />
           Model Tuner
-          {isLoading && <Pulsating className="ml-2 text-purple-400" />}
+          {isLoading && <Pulsating className="ml-2 text-purple-400"><span>Loading...</span></Pulsating>}
         </CardTitle>
         <CardDescription>Fine-tune models with your custom datasets</CardDescription>
       </CardHeader>

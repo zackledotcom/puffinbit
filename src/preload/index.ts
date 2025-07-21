@@ -931,6 +931,14 @@ const api = {
       rateLimit('analytics-track')
       ipcRenderer.send('analytics:track', 'message-sent', data)
     }
+  },
+
+  // Assistant UI integration handler
+  assistantUIChat: (
+    request: any
+  ): Promise<{ success: boolean; message?: string; error?: string; metadata?: any }> => {
+    rateLimit('assistant-ui-chat')
+    return ipcRenderer.invoke('assistant-ui-chat', request)
   }
 } as const
 
@@ -951,6 +959,16 @@ if (process.contextIsolated) {
       },
       onExecuteResponse: (cb: (result: string) => void) => {
         ipcRenderer.on('execute-response', (_e, result) => cb(result))
+      },
+      canvas: {
+        listFiles: (dirPath: string) => ipcRenderer.invoke('canvas:listFiles', dirPath),
+        readFile: (filePath: string) => ipcRenderer.invoke('canvas:readFile', filePath),
+        writeFile: (filePath: string, content: string) => ipcRenderer.invoke('canvas:writeFile', filePath, content),
+        createFile: (filePath: string) => ipcRenderer.invoke('canvas:createFile', filePath),
+        createFolder: (folderPath: string) => ipcRenderer.invoke('canvas:createFolder', folderPath),
+        delete: (itemPath: string) => ipcRenderer.invoke('canvas:delete', itemPath),
+        rename: (oldPath: string, newName: string) => ipcRenderer.invoke('canvas:rename', oldPath, newName),
+        uploadFiles: () => ipcRenderer.invoke('canvas:uploadFiles'),
       }
     })
   } catch (error) {
