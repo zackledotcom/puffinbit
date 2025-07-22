@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { spawn, ChildProcess } from 'child_process';
-import { safeLog, safeError } from '@utils/safeLogger';
-import { ollamaService } from './ollamaService'; // Assume for embeddings
+import { safeLog, safeError } from '../../../utils/safeLogger';
 
 const CHROMA_BASE_URL = 'http://localhost:8000';
 
@@ -28,7 +27,7 @@ let chromaProcess: ChildProcess | null = null;
 
 class ChromaService {
   private baseUrl = CHROMA_BASE_URL;
-  private queryCache = new Map<string, QueryResult>(); // Simple cache
+  private cache = new Map<string, QueryResult>(); // Query caching
 
   async checkStatus(): Promise<ServiceStatus> {
     try {
@@ -52,11 +51,9 @@ class ChromaService {
   async addDocuments(collectionName: string, documents: string[], metadatas?: Record<string, any>[], ids?: string[]): Promise<{ success: boolean; addedCount: number; error?: string }> {
     try {
       await this.createCollection(collectionName);
-      const embeddings = await this.generateEmbeddings(documents); // New: Generate embeddings
       const docIds = ids || documents.map((_, i) => `doc_${Date.now()}_${i}`);
       await this.retry(() => axios.post(`${this.baseUrl}/api/v1/collections/${collectionName}/add`, {
         documents,
-        embeddings,
         metadatas: metadatas || documents.map(() => ({})),
         ids: docIds,
       }));
@@ -68,14 +65,13 @@ class ChromaService {
 
   async queryCollection(collectionName: string, queryTexts: string[], nResults: number = 5): Promise<{ success: boolean; results?: QueryResult; error?: string }> {
     const cacheKey = `${collectionName}:${queryTexts.join(',')}:${nResults}`;
-    if (this.queryCache.has(cacheKey)) return { success: true, results: this.queryCache.get(cacheKey) };
+    if (this.cache.has(cacheKey)) return { success: true, results: this.cache.get(cacheKey) };
     try {
-      const queryEmbeddings = await this.generateEmbeddings(queryTexts); // New: Embed queries
       const { data } = await this.retry(() => axios.post(`${this.baseUrl}/api/v1/collections/${collectionName}/query`, {
-        query_embeddings: queryEmbeddings,
+        query_texts: queryTexts,
         n_results: nResults,
       }));
-      this.queryCache.set(cacheKey, data);
+      this.cache.set(cacheKey, data);
       return { success: true, results: data };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -106,16 +102,8 @@ class ChromaService {
     for (const path of paths) {
       try {
         chromaProcess = spawn(path, ['run', '--port', '8000'], { stdio: 'pipe' });
-        
-        // PHASE 2 FIX: Unref process to prevent M1 CPU drain
-        chromaProcess.unref();
-        
         chromaProcess.on('error', (err) => safeError('Chroma error:', err));
-        chromaProcess.on('exit', (code) => {
-          safeLog(`Chroma exited: ${code}`);
-          chromaProcess = null; // Clean up reference
-        });
-        
+        chromaProcess.on('exit', (code) => safeLog(`Chroma exited: ${code}`));
         await new Promise(r => setTimeout(r, 4000));
         if (await this.checkStatus().then(s => s.connected)) return { success: true, message: 'Chroma started' };
       } catch {}
@@ -145,15 +133,6 @@ class ChromaService {
     const result = await this.queryCollection(collectionName, [query], limit);
     if (result.success && result.results) return { success: true, results: result.results.documents[0] || [] };
     return { success: false, error: result.error };
-  }
-
-  private async generateEmbeddings(texts: string[]): Promise<number[][]> {
-    // Stub: Use Ollama for embeddings (replace with actual model)
-    const embeddings = await Promise.all(texts.map(async (text) => {
-      const { response } = await ollamaService.generateResponse({ model: 'nomic-embed-text', prompt: text, options: { num_predict: 128 } });
-      return JSON.parse(response || '[]') as number[]; // Assume response is embedding array
-    }));
-    return embeddings;
   }
 
   private async retry<T>(fn: () => Promise<T>, attempts = 3, delay = 1000): Promise<T> {

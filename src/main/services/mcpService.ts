@@ -156,6 +156,9 @@ class MCPService extends EventEmitter {
         env: { ...process.env, NODE_ENV: 'production' }
       })
 
+      // PHASE 2 FIX: Unref process to prevent M1 CPU drain
+      childProcess.unref();
+
       childProcess.on('error', (error) => {
         safeError(`MCP server ${config.name} error:`, error)
         this.servers.delete(config.name)

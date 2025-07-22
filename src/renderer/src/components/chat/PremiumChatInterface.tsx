@@ -16,7 +16,13 @@ import {
   Brain,
   Export,
   Eraser,
-  Code
+  Code,
+  Lightning,
+  Robot,
+  Sparkle,
+  MagicWand,
+  Download,
+  Upload
 } from 'phosphor-react'
 
 // Magic UI Components for enhanced experience
@@ -76,6 +82,10 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
   const [darkMode, setDarkMode] = useState(true)
   const [selectedContext, setSelectedContext] = useState('General')
   
+  // Apple-style dropdown states
+  const [customModelDropdownOpen, setCustomModelDropdownOpen] = useState(false)
+  const [lightningDropdownOpen, setLightningDropdownOpen] = useState(false)
+  
   const availableModels = [
     'llama3.2:latest',
     'qwen2.5:latest', 
@@ -116,6 +126,22 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customModelDropdownOpen || lightningDropdownOpen) {
+        const target = event.target as Element
+        if (!target.closest('.relative')) {
+          setCustomModelDropdownOpen(false)
+          setLightningDropdownOpen(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [customModelDropdownOpen, lightningDropdownOpen])
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
@@ -173,6 +199,175 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
       .replace('openchat', 'OpenChat')
       .replace('llama3.2', 'Llama 3.2')
   }
+
+  // Apple-style Dropdown Overlay Component
+  const AppleDropdownOverlay = ({ 
+    isOpen, 
+    onClose, 
+    children, 
+    className = "" 
+  }: { 
+    isOpen: boolean
+    onClose: () => void
+    children: React.ReactNode
+    className?: string 
+  }) => (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-40"
+            onClick={onClose}
+          />
+          
+          {/* Dropdown Panel */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 400, 
+              damping: 30,
+              duration: 0.2 
+            }}
+            className={cn(
+              "absolute top-12 right-0 z-50 w-80 rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-zinc-800/50 shadow-2xl overflow-hidden",
+              className
+            )}
+            style={{
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+            }}
+          >
+            {children}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+
+  // Custom Model Creation Panel
+  const CustomModelPanel = () => (
+    <div className="p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+          <Robot size={20} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Create Custom Model</h3>
+          <p className="text-sm text-zinc-400">Build and tune your own AI model</p>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <button className="w-full p-4 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 transition-all duration-200 text-left group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <MagicWand size={18} className="text-blue-400" />
+              <div>
+                <div className="text-white font-medium">Quick Setup</div>
+                <div className="text-xs text-zinc-400">Use templates and presets</div>
+              </div>
+            </div>
+            <CaretDown size={14} className="text-zinc-500 group-hover:text-white transition-colors" />
+          </div>
+        </button>
+        
+        <button className="w-full p-4 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 transition-all duration-200 text-left group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Code size={18} className="text-green-400" />
+              <div>
+                <div className="text-white font-medium">Advanced Editor</div>
+                <div className="text-xs text-zinc-400">Custom Modelfile creation</div>
+              </div>
+            </div>
+            <CaretDown size={14} className="text-zinc-500 group-hover:text-white transition-colors" />
+          </div>
+        </button>
+        
+        <button className="w-full p-4 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 transition-all duration-200 text-left group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Upload size={18} className="text-purple-400" />
+              <div>
+                <div className="text-white font-medium">Import Model</div>
+                <div className="text-xs text-zinc-400">Load from file or URL</div>
+              </div>
+            </div>
+            <CaretDown size={14} className="text-zinc-500 group-hover:text-white transition-colors" />
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+
+  // Lightning Performance Panel
+  const LightningPanel = () => (
+    <div className="p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 flex items-center justify-center">
+          <Lightning size={20} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Performance</h3>
+          <p className="text-sm text-zinc-400">Optimize speed and quality</p>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        {/* Performance Mode */}
+        <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-white font-medium">Performance Mode</span>
+            <div className="w-12 h-6 bg-blue-500 rounded-full relative cursor-pointer">
+              <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all"></div>
+            </div>
+          </div>
+          <div className="text-xs text-zinc-400">Optimize for speed on Apple Silicon</div>
+        </div>
+        
+        {/* GPU Acceleration */}
+        <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-white font-medium">GPU Acceleration</span>
+            <div className="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer">
+              <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all"></div>
+            </div>
+          </div>
+          <div className="text-xs text-zinc-400">Use Metal Performance Shaders</div>
+        </div>
+        
+        {/* Temperature Slider */}
+        <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-white font-medium">Creativity</span>
+            <span className="text-xs text-zinc-400">0.7</span>
+          </div>
+          <div className="w-full h-2 bg-zinc-700 rounded-full">
+            <div className="w-3/4 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+          </div>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="flex gap-2 pt-2">
+          <button className="flex-1 p-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 transition-all duration-200 text-center">
+            <Sparkle size={16} className="text-yellow-400 mx-auto mb-1" />
+            <div className="text-xs text-white">Optimize</div>
+          </button>
+          <button className="flex-1 p-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 transition-all duration-200 text-center">
+            <Download size={16} className="text-blue-400 mx-auto mb-1" />
+            <div className="text-xs text-white">Export</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="premium-chat-container flex h-screen relative bg-black text-white font-inter">
@@ -233,14 +428,11 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
                   Choose Model
                 </div>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="w-full">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-between text-white hover:bg-zinc-800 text-sm bg-transparent border border-zinc-700 h-11"
-                    >
-                      <span className="truncate text-white">{getModelDisplayName(selectedModel)}</span>
+                  <DropdownMenuTrigger asChild>
+                    <div className="w-full flex items-center justify-between h-11 px-3 rounded-md bg-transparent text-white hover:bg-zinc-800 border border-zinc-700 hover:border-blue-300/50 transition-colors text-sm cursor-pointer">
+                      <span className="truncate text-sm">{getModelDisplayName(selectedModel)}</span>
                       <CaretDown size={12} className="text-zinc-400" />
-                    </Button>
+                    </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48 bg-zinc-950 border-zinc-900">
                     {availableModels.map((model) => (
@@ -389,6 +581,55 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
             >
               <Sliders size={16} />
             </Button>
+          </div>
+          
+          {/* Right Side - Apple-style Dropdowns */}
+          <div className="flex items-center gap-2 relative">
+            {/* Lightning Performance Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setLightningDropdownOpen(!lightningDropdownOpen)
+                  setCustomModelDropdownOpen(false)
+                }}
+                className="text-white hover:text-yellow-400 hover:bg-yellow-500/20 p-2 transition-all duration-200"
+                title="Performance Settings"
+              >
+                <Lightning size={18} />
+              </Button>
+              
+              <AppleDropdownOverlay
+                isOpen={lightningDropdownOpen}
+                onClose={() => setLightningDropdownOpen(false)}
+              >
+                <LightningPanel />
+              </AppleDropdownOverlay>
+            </div>
+            
+            {/* Custom Model Creation Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCustomModelDropdownOpen(!customModelDropdownOpen)
+                  setLightningDropdownOpen(false)
+                }}
+                className="text-white hover:text-purple-400 hover:bg-purple-500/20 p-2 transition-all duration-200"
+                title="Create Custom Model"
+              >
+                <Plus size={18} />
+              </Button>
+              
+              <AppleDropdownOverlay
+                isOpen={customModelDropdownOpen}
+                onClose={() => setCustomModelDropdownOpen(false)}
+              >
+                <CustomModelPanel />
+              </AppleDropdownOverlay>
+            </div>
           </div>
         </div>
         {/* Messages Area - BLACK BACKGROUND */}
@@ -539,16 +780,14 @@ const PremiumChatInterface: React.FC<PremiumChatInterfaceProps> = ({
               <div className="flex items-center gap-2 p-2">
                 {/* Context Selector - Far Left */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-zinc-400 hover:text-white hover:bg-zinc-800 px-2 h-8 text-xs"
+                  <DropdownMenuTrigger asChild>
+                    <div
+                      className="inline-flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 px-2 h-8 text-xs cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                       title="Select Context"
                     >
                       {selectedContext}
                       <CaretDown size={10} className="ml-1" />
-                    </Button>
+                    </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-32 bg-zinc-950 border-zinc-900">
                     {availableContexts.map((context) => (

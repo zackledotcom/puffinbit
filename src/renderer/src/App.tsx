@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
 // Core Chat Components
 import PuffinAssistant from './components/chat/PuffinAssistant'
@@ -24,15 +24,16 @@ interface AppState {
   showAgentManager: boolean
   showAdvancedMemory: boolean
   selectedModel: string
+  availableModels: string[] // Added for dynamic
   theme: 'light' | 'dark' | 'system'
   showDemo: boolean
   testAssistantUI: boolean  // NEW: Toggle for testing Assistant UI
 }
 
-// Simple error boundary
+// PHASE 1 FIX: Enhanced Error Boundary with IPC Safety
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode; fallback?: React.ReactNode },
-  { hasError: boolean; error?: Error }
+  { hasError: boolean; error?: Error; errorInfo?: React.ErrorInfo }
 > {
   constructor(props: any) {
     super(props)
@@ -45,15 +46,38 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Component Error:', error, errorInfo)
+    
+    // PHASE 1 FIX: Check for IPC-related errors
+    if (error.message.includes('window.api') || error.message.includes('ipc')) {
+      console.error('🔴 IPC Error Detected - Check main process handlers:', error)
+    }
+    
+    this.setState({ errorInfo })
   }
 
   render() {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="p-4 bg-red-50 border border-red-200 rounded">
-            <h3 className="text-red-800 font-semibold">Component Error</h3>
-            <p className="text-red-600 text-sm mt-1">{this.state.error?.message}</p>
+          <div className="p-6 bg-red-50 border border-red-200 rounded-lg max-w-2xl mx-auto mt-8">
+            <h3 className="text-red-800 font-semibold mb-2">Application Error</h3>
+            <p className="text-red-600 text-sm mb-4">{this.state.error?.message}</p>
+            {this.state.error?.message.includes('window.api') && (
+              <div className="bg-red-100 p-3 rounded border-l-4 border-red-500 mb-4">
+                <p className="text-red-700 text-sm font-medium">
+                  🔧 IPC Connection Issue Detected
+                </p>
+                <p className="text-red-600 text-xs mt-1">
+                  The main process IPC handlers may not be properly registered. Check console for details.
+                </p>
+              </div>
+            )}
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+              Reload Application
+            </button>
           </div>
         )
       )
@@ -72,10 +96,73 @@ const App: React.FC = () => {
     showAgentManager: false,
     showAdvancedMemory: false,
     selectedModel: 'tinydolphin:latest',
+    availableModels: [], // Dynamic load
     theme: 'system',
     showDemo: false,
     testAssistantUI: false  // NEW: Start with your working interface
   })
+
+  // PHASE 1 FIX: IPC Safety and API Availability Check
+  const [apiReady, setApiReady] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  // Check window.api availability on mount
+  useEffect(() => {
+    const checkAPI = async () => {
+      try {
+        if (typeof window === 'undefined') {
+          throw new Error('Window object not available')
+        }
+        
+        if (!window.api) {
+          throw new Error('window.api is undefined - IPC bridge not loaded')
+        }
+
+        // Test basic IPC functionality
+        console.log('🔧 Testing IPC connection...')
+        const testResult = await window.api.checkOllamaStatus().catch(err => {
+          console.warn('Ollama status check failed (expected on first run):', err.message)
+          return { success: false, message: 'Service not running' }
+        })
+        
+        console.log('✅ IPC bridge connected successfully')
+        setApiReady(true)
+        setApiError(null)
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown API error'
+        console.error('🔴 IPC API Error:', errorMessage)
+        setApiError(errorMessage)
+        setApiReady(false)
+        
+        // Retry after 2 seconds
+        setTimeout(checkAPI, 2000)
+      }
+    }
+
+    checkAPI()
+  }, [])
+
+  // Show loading state while API initializes
+  if (!apiReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#1a1a1a] text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4 mx-auto"></div>
+          <h2 className="text-xl font-semibold mb-2">Initializing Puffer AI</h2>
+          {apiError ? (
+            <div className="bg-red-900/30 border border-red-500 rounded-lg p-4 max-w-md">
+              <p className="text-red-400 text-sm mb-2">IPC Connection Error:</p>
+              <p className="text-red-300 text-xs">{apiError}</p>
+              <p className="text-gray-400 text-xs mt-2">Retrying connection...</p>
+            </div>
+          ) : (
+            <p className="text-gray-400">Loading IPC bridge...</p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   // Add state for PremiumChatInterface
   type MessageType = 'user' | 'assistant' | 'system';
@@ -91,6 +178,42 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState({ responseTime: 234, tokens: 1247, modelLoad: 89 })
+
+  // PHASE 1 FIX: Load dynamic models with proper error handling
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        console.log('🔧 Loading available models...')
+        const response = await window.api.getOllamaModels()
+        
+        if (response.success && response.models) {
+          const models = response.models
+          console.log(`✅ Loaded ${models.length} models:`, models)
+          setState(prev => ({ 
+            ...prev, 
+            availableModels: models, 
+            selectedModel: models[0] || prev.selectedModel 
+          }))
+        } else {
+          console.warn('⚠️ Failed to load models:', response.error)
+          // Keep default model if loading fails
+          setState(prev => ({ 
+            ...prev, 
+            availableModels: [prev.selectedModel] 
+          }))
+        }
+      } catch (error) {
+        console.error('🔴 Error loading models:', error)
+        // Fallback to default model
+        setState(prev => ({ 
+          ...prev, 
+          availableModels: [prev.selectedModel] 
+        }))
+      }
+    }
+
+    loadModels()
+  }, [apiReady]) // Only load models after API is ready
 
   // REAL MESSAGE HANDLING - Connect to actual Puffin API
   const handleSendMessage = async (content: string) => {

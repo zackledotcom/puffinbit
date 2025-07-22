@@ -23,6 +23,9 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -39,7 +42,9 @@
     "dist:mac": "npm run build && electron-builder --mac --publish=never",
     "dist:win": "npm run build && electron-builder --win --publish=never",
     "dist:linux": "npm run build && electron-builder --linux --publish=never",
-    "pack": "npm run build && electron-builder --dir"
+    "pack": "npm run build && electron-builder --dir",
+    "verify:phase1": "node scripts/verify-phase1.js",
+    "verify:phase2": "node scripts/verify-phase2.js"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.10.26",
@@ -100,6 +105,7 @@
     "@electron-toolkit/eslint-config-ts": "^1.0.1",
     "@electron-toolkit/tsconfig": "^1.0.1",
     "@rushstack/eslint-patch": "^1.7.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^18.19.9",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
@@ -112,10 +118,12 @@
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "jest": "^30.0.4",
     "madge": "^8.0.0",
     "postcss": "^8.4.32",
     "prettier": "^3.2.4",
     "tailwindcss": "^3.3.6",
+    "ts-jest": "^29.4.0",
     "ts-prune": "^0.10.3",
     "typescript": "^5.3.3",
     "vite": "^5.0.12"

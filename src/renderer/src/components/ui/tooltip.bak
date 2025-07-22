@@ -21,3 +21,39 @@ interface ContentProps {
 export const TooltipContent: React.FC<ContentProps> = ({ children, className }) => (
   <span className={cn('ml-1 text-xs text-gray-400', className)}>{children}</span>
 );
+  asChild?: boolean;
+  className?: string;
+}
+
+  <span className={cn(className)}>{children}</span>
+);
+
+interface ContentProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+  
+);
+
+
+import * as React from 'react'
+import { cn } from '@/lib/utils'
+
+
+  children: React.ReactNode
+  content: string
+  className?: string
+}
+
+
+  return (
+    <div title={content} className={cn('inline-block', className)}>
+      {children}
+    </div>
+  )
+}
+
+
+
+

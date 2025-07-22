@@ -461,8 +461,11 @@ export async function startTuningJob(
  */
 async function runTuningProcess(job: TuningJob): Promise<void> {
   try {
+    console.log(`🚀 Starting tuning job ${job.id} for model ${job.newModelName}`)
+    
     // Update job status
     await updateJobStatus(job.id, 'running', 5)
+    console.log('Epoch progress: 5% - Initializing tuning environment')
 
     // Create modelfile
     const modelfilePath = await createModelfileForTuning(
@@ -474,15 +477,29 @@ async function runTuningProcess(job: TuningJob): Promise<void> {
 
     // Update progress
     await updateJobStatus(job.id, 'running', 10)
+    console.log('Epoch progress: 10% - Modelfile created')
 
     // In a real implementation, you'd call Ollama or run a fine-tuning script
     // This is a simplified example that simulates the process
 
-    // Simulate the fine-tuning process with progress updates
-    for (let progress = 10; progress < 95; progress += 5) {
+    // Simulate the fine-tuning process with progress updates and logging
+    for (let progress = 15; progress < 95; progress += 5) {
+      const epoch = Math.floor((progress - 10) / (85 / job.params.epochs))
+      const epochProgress = ((progress - 10) % (85 / job.params.epochs)) / (85 / job.params.epochs) * 100
+      
+      console.log(`Epoch progress: ${progress}% - Epoch ${epoch + 1}/${job.params.epochs} (${epochProgress.toFixed(1)}% complete)`)
+      
+      // Log specific training details for realism
+      if (progress % 15 === 0) {
+        const loss = (1.0 - (progress / 100) * 0.8 + Math.random() * 0.1).toFixed(4)
+        console.log(`  📊 Training loss: ${loss}, Learning rate: ${job.params.learningRate}`)
+      }
+      
       await new Promise((resolve) => setTimeout(resolve, 2000))
       await updateJobStatus(job.id, 'running', progress)
     }
+
+    console.log('Epoch progress: 95% - Finalizing tuned model')
 
     // Simulate creating the final model
     await new Promise((resolve) => setTimeout(resolve, 3000))

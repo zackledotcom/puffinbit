@@ -1,111 +1,63 @@
-appId: com.puffer.ai.assistant
-productName: Puffer
-copyright: Copyright © 2025 Puffer Team
-
+appId: com.electron.puffin
+productName: Puffin AI Assistant
 directories:
-  buildResources: build
   output: dist
+  app: out
 
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!{logs/*,chroma-data/*,backups/*,gemini-tasks/*,claude\ tasks/*}'
-  - '!{*.sh,*.md,security_audit_report.md}'
-  - '!{out/main/geminiMemory-*.js,out/main/agents-*.js}'
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/@types/**/*"
+  - "!node_modules/.cache/**/*"
+  - "!coverage/**/*"
+  - "!src/**/*"
+  - "!test/**/*"
+  - "!jest.config.json"
+  - "!tsconfig*.json"
 
-extraResources:
-  - from: "resources/"
-    to: "resources/"
-    filter: ["**/*"]
-
-# Windows Configuration
+mac:
+  target: 
+    - target: dmg
+      arch: 
+        - x64
+        - arm64
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  
 win:
+  target: nsis
   icon: resources/icon.ico
-  target:
-    - target: nsis
-      arch: [x64]
-  executableName: Puffer
-  artifactName: Puffer-${version}-win-${arch}.${ext}
+  
+linux:
+  target: AppImage
+  icon: resources/icon.png
+  category: Development
+
+dmg:
+  title: "Puffin AI Assistant"
+  icon: resources/icon.icns
+  backgroundColor: "#1a1a1c"
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  allowElevation: true
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  shortcutName: Puffer
-  uninstallDisplayName: Puffer - Privacy-First AI Assistant
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  runAfterFinish: true
+  shortcutName: "Puffin AI Assistant"
 
-# macOS Configuration  
-mac:
-  icon: resources/icon.icns
-  category: public.app-category.productivity
-  target:
-    - target: dmg
-      arch: [x64, arm64]
-  artifactName: Puffer-${version}-mac-${arch}.${ext}
-  entitlementsInherit: build/entitlements.mac.plist
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  notarize: false
-
-dmg:
-  title: Puffer ${version}
-  icon: resources/icon.icns
-  iconSize: 80
-  contents:
-    - x: 410
-      y: 150
-      type: link
-      path: /Applications
-    - x: 130
-      y: 150
-      type: file
-
-# Linux Configuration
-linux:
-  icon: resources/icon.png
-  target:
-    - target: AppImage
-      arch: [x64]
-    - target: deb
-      arch: [x64]
-  maintainer: Puffer Team
-  category: Office
-  desktop:
-    Name: Puffer
-    Comment: Privacy-first AI assistant powered by Puffer
-    Keywords: AI;Assistant;Privacy;Local;Ollama;Puffer
-    StartupWMClass: Puffer
-
-appImage:
-  artifactName: Puffer-${version}-linux-${arch}.${ext}
-
-deb:
-  packageName: puffer
-  depends: ["gconf2", "gconf-service", "libgtk-3-0", "libx11-xcb1", "libxss1", "libasound2"]
-
-# Build Options
-compression: maximum
-npmRebuild: false
-buildDependenciesFromSource: false
-nodeGypRebuild: false
-
-# Security Settings
-asar: true
-asarUnpack:
-  - "**/*.{node,dll,dylib,so}"
-  - resources/**
-
-# Auto-updater (disabled for initial release)
-publish: null
-
-electronDownload:
-  cache: ".electron-cache"
+publish:
+  provider: github
+  owner: puffer
+  repo: puffin-ai-assistant
+  private: false

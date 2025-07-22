@@ -109,24 +109,78 @@ const MemoryManagerPanel: React.FC<MemoryManagerPanelProps> = ({ className }) =>
 
   const loadMemoryData = async () => {
     setLoading(true)
+    setIsSearching(true)
     try {
-      // BACKEND EXISTS - activate these calls
-      const chunks = await window.api.getMemoryChunks()
-      setMemoryChunks(chunks)
-      setFilteredChunks(chunks)
-
-      const stats = await window.api.getMemoryStats()
-      setMemoryStats(stats)
-
-      console.log('✅ Loaded memory data:', chunks.length, 'chunks')
+      // Use real memory search with wildcard to get all chunks
+      const response = await window.api.searchMemory(searchQuery || '*', 50)
+      
+      if (response && response.length > 0) {
+        const chunks = response.map((result: any, index: number) => ({
+          id: result.id || `chunk-${index}`,
+          summary: result.summary || extractSummary(result.content || result.text || ''),
+          content: result.content || result.text || '',
+          topics: result.topics || extractTopics(result.content || result.text || ''),
+          keyFacts: result.keyFacts || [],
+          relevance: result.relevance || result.score || 0.8,
+          timestamp: result.timestamp || new Date().toISOString(),
+          source: result.source || 'chat',
+          selected: false
+        }))
+        
+        setMemoryChunks(chunks)
+        setFilteredChunks(chunks)
+        
+        // Generate stats from real data
+        const stats = {
+          totalChunks: chunks.length,
+          totalTokens: chunks.reduce((sum, chunk) => sum + (chunk.content.length / 4), 0), // Rough token estimate
+          averageRelevance: chunks.reduce((sum, chunk) => sum + chunk.relevance, 0) / chunks.length,
+          recentActivity: chunks.filter(chunk => 
+            Date.now() - new Date(chunk.timestamp).getTime() < 24 * 60 * 60 * 1000
+          ).length
+        }
+        setMemoryStats(stats)
+        
+        console.log('✅ Loaded real memory data:', chunks.length, 'chunks')
+      } else {
+        // Empty state
+        setMemoryChunks([])
+        setFilteredChunks([])
+        setMemoryStats({ totalChunks: 0, totalTokens: 0, averageRelevance: 0, recentActivity: 0 })
+      }
     } catch (error) {
       console.error('❌ Failed to load memory data:', error)
       // Fallback to empty state
       setMemoryChunks([])
       setFilteredChunks([])
+      setMemoryStats({ totalChunks: 0, totalTokens: 0, averageRelevance: 0, recentActivity: 0 })
     } finally {
       setLoading(false)
+      setIsSearching(false)
     }
+  }
+
+  // Helper functions for data extraction
+  const extractSummary = (content: string): string => {
+    const sentences = content.split('. ')
+    return sentences.slice(0, 2).join('. ') + (sentences.length > 2 ? '...' : '')
+  }
+
+  const extractTopics = (content: string): string[] => {
+    // Simple topic extraction - in production this would be more sophisticated
+    const words = content.toLowerCase().match(/\b\w{4,}\b/g) || []
+    const commonWords = new Set(['this', 'that', 'with', 'from', 'they', 'have', 'were', 'been', 'have'])
+    const topics = words
+      .filter(word => !commonWords.has(word))
+      .reduce((acc: { [key: string]: number }, word) => {
+        acc[word] = (acc[word] || 0) + 1
+        return acc
+      }, {})
+    
+    return Object.entries(topics)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([word]) => word)
   }
 
   // Load mock data for demo

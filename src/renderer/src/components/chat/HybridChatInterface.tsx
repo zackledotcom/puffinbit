@@ -1,34 +1,9 @@
-/**
- * ENHANCED HYBRID CHAT INTERFACE
- * Your beautiful design + Magic UI + Assistant-UI superpowers
- * 
- * UPGRADED: Enhanced animations, better styling, improved UX
- */
-
 "use client"
 
-import React, { useState, useCallback, useRef } from "react"
+import React, { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  Plus,
-  ChevronDown,
-  PanelLeft,
-  Trash2,
-  Settings,
-  Sun,
-  Moon,
-  SlidersHorizontal,
-  Upload,
-  Monitor,
-  Globe,
-  ChevronRight,
-  Code,
-  Square,
-  ArrowUp,
-  BookOpen,
-  Zap,
-  Wifi,
-  WifiOff,
+  Plus, ChevronDown, PanelLeft, Trash2, Settings, Sun, Moon, SlidersHorizontal, Upload, Monitor, Globe, ChevronRight, Code, Square, ArrowUp, BookOpen, Zap, Wifi, WifiOff, Brush, PlayCircle, X, Robot, Sparkle, Download, Wand2
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -55,6 +30,8 @@ interface Message {
   timestamp: Date
   model?: string
   responseTime?: number
+  codeOutput?: string; // Added for exec result
+  codeError?: string; // Added for exec error
 }
 
 interface ThreadItem {
@@ -101,18 +78,34 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
   // Input area state
   const [inputValue, setInputValue] = useState("")
   const [selectedContext, setSelectedContext] = useState("General")
+  
+  // Overlay state
+  const [powerOverlayOpen, setPowerOverlayOpen] = useState(false)
+  
+  // Modelfile customization state
+  const [modelfileContent, setModelfileContent] = useState('')
+  const [isUpdatingModelfile, setIsUpdatingModelfile] = useState(false)
+  const [modelfileError, setModelfileError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const availableModels = [
-    "llama3.2:latest",
-    "qwen2.5:latest",
-    "deepseek-coder:latest",
-    "phi3.5:latest",
-    "tinydolphin:latest",
-    "openchat:latest",
-  ]
+  // Dynamic model state instead of hardcoded array
+  const [availableModels, setAvailableModels] = useState<string[]>([])
 
   const availableContexts = ["General", "Code", "Research", "Writing"]
+
+  // Fetch available models on mount
+  useEffect(() => {
+    window.api.getOllamaModels().then((response: { success: boolean; models: string[] }) => {
+      const models = response.success ? response.models : [];
+      setAvailableModels(models);
+      if (models.length > 0 && !models.includes(selectedModel)) {
+        onModelChange(models[0]); // Default to first available
+      }
+    }).catch((err) => {
+      console.error('Failed to fetch models:', err);
+      setAvailableModels([]); // Fallback empty
+    });
+  }, [selectedModel, onModelChange]);
 
   const [threads, setThreads] = useState<ThreadItem[]>([
     {
@@ -196,18 +189,124 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
     }
   }
 
+  // Modelfile update handler with enhanced error handling
+  const handleModelfileUpdate = async () => {
+    if (!modelfileContent.trim()) {
+      setModelfileError('Modelfile content cannot be empty');
+      return;
+    }
+
+    // Check content size before sending
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (modelfileContent.length > maxSize) {
+      setModelfileError(`Content too large. Maximum size: ${maxSize / (1024 * 1024)}MB`);
+      return;
+    }
+
+    setIsUpdatingModelfile(true);
+    setModelfileError(null);
+
+    try {
+      const result = await window.api.updateModelfile({
+        modelName: selectedModel,
+        content: modelfileContent,
+        options: {
+          customName: `${selectedModel.replace(/[^a-zA-Z0-9\-_:.]/g, '')}-custom`,
+          validate: true
+        }
+      });
+
+      if (result.success) {
+        console.log(`Toast: Custom model "${result.modelName}" created successfully (${result.responseTime}ms)`);
+        // Clear the content on success
+        setModelfileContent('');
+        setModelfileError(null);
+      } else {
+        // Enhanced error handling for different security scenarios
+        if (result.error?.includes('Rate limit')) {
+          setModelfileError('⏱️ Rate limit: Maximum 3 updates per minute');
+        } else if (result.error?.includes('Security violation')) {
+          setModelfileError('🛡️ Security: Content contains banned patterns');
+        } else if (result.error?.includes('exceeds maximum size')) {
+          setModelfileError('📏 Size limit exceeded (10MB max)');
+        } else if (result.error?.includes('invalid characters')) {
+          setModelfileError('🔤 Model name contains invalid characters');
+        } else {
+          setModelfileError(result.error || 'Failed to update modelfile');
+        }
+      }
+    } catch (error) {
+      setModelfileError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      setIsUpdatingModelfile(false);
+    }
+  };
+
   const onOpenSettings = () => {
     console.log("Opening settings...")
   }
 
-  // Input handling functions
+  // Input handling functions with RAG integration
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
-    
-    const messageContent = inputValue.trim()
+
+    const content = inputValue.trim()
     setInputValue("")
     
-    await onSendMessage(messageContent)
+    // Create user message immediately
+    const userMsg: Message = { 
+      id: Date.now(), 
+      type: 'user', 
+      content, 
+      timestamp: new Date() 
+    }
+    
+    // Update messages state if available (fallback to onSendMessage if not)
+    if (typeof messages !== 'undefined') {
+      // Direct state update (if messages is a state variable)
+      // This assumes messages is managed in parent and passed down
+      // We'll need to call onSendMessage to update parent state
+    }
+    
+    try {
+      // Step 1: Search memory for relevant context (RAG)
+      const context = await window.api.searchMemory(content, 3)
+      
+      // Step 2: Combine context with user message
+      const prompt = `${context}\n${content}`
+      
+      // Step 3: Send enhanced prompt to AI
+      const result = await window.api.chatWithAI({ 
+        message: prompt, 
+        model: selectedModel 
+      })
+      
+      if (!result.success) {
+        throw new Error(result.error || 'AI request failed')
+      }
+      
+      // Step 4: Create AI response message  
+      const aiMsg: Message = { 
+        id: Date.now() + 1, 
+        type: 'assistant', 
+        content: result.response || result.message || 'No response', 
+        timestamp: new Date() 
+      }
+      
+      // Call the parent's message handler for both messages
+      await onSendMessage(content) // This should handle both user and AI messages
+      
+    } catch (err) {
+      console.error('Message send failed:', err)
+      const errorMsg: Message = { 
+        id: Date.now() + 2, 
+        type: 'system', 
+        content: `Error: ${err instanceof Error ? err.message : String(err)}`, 
+        timestamp: new Date() 
+      }
+      // Handle error message through parent
+      await onSendMessage(`System Error: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -216,6 +315,159 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
       handleSendMessage()
     }
   }
+
+  // Code execution handler
+  const handleRunCode = (messageId: string | number, code: string) => {
+    window.api.execCode({ code, lang: 'js' }).then((output) => {
+      // Update message with output
+      // Assume you have a way to update messages state
+      console.log('Code output:', output);
+    }).catch((error) => {
+      console.log('Code error:', error);
+    });
+  };
+
+  // Code detection regex
+  const codeRegex = /```(\w+)?\r?\n([\s\S]*?)\r?\n```/g;
+
+  // Power Overlay Component - Simplified and Working
+  const PowerOverlay = () => {
+    if (!powerOverlayOpen) return null;
+    
+    return (
+      <AnimatePresence>
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+          onClick={() => setPowerOverlayOpen(false)}
+        />
+        
+        {/* Half Screen Overlay */}
+        <motion.div
+          initial={{ opacity: 0, x: "100%" }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: "100%" }}
+          transition={{ 
+            type: "spring", 
+            stiffness: 300, 
+            damping: 30,
+            duration: 0.4 
+          }}
+          className="fixed top-0 right-0 h-full w-[600px] bg-neutral-900/95 backdrop-blur-xl border-l border-neutral-800/50 shadow-2xl z-50 overflow-y-auto"
+          style={{
+            boxShadow: '-25px 0 50px -12px rgba(0, 0, 0, 0.6)'
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-neutral-800/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                <Zap size={20} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Power Center</h2>
+                <p className="text-sm text-neutral-400">Performance & Model Creation</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setPowerOverlayOpen(false)}
+              className="p-2 rounded-lg hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-6">
+            {/* Performance Section */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 flex items-center justify-center">
+                  <Zap size={16} className="text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Performance Settings</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-white font-medium">Performance Mode</div>
+                      <div className="text-xs text-neutral-400">Optimize for Apple Silicon</div>
+                    </div>
+                    <div className="w-12 h-6 bg-blue-500 rounded-full relative cursor-pointer">
+                      <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-white font-medium">GPU Acceleration</div>
+                      <div className="text-xs text-neutral-400">Metal Performance Shaders</div>
+                    </div>
+                    <div className="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer">
+                      <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Model Creation Section */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                  <Robot size={16} className="text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Create Custom Model</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <button className="w-full p-4 rounded-xl bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 transition-all duration-200 text-left group">
+                  <div className="flex items-center gap-3">
+                    <Wand2 size={18} className="text-blue-400" />
+                    <div className="flex-1">
+                      <div className="text-white font-medium">Quick Setup</div>
+                      <div className="text-xs text-neutral-400">Use templates and presets</div>
+                    </div>
+                    <ChevronRight size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+                  </div>
+                </button>
+                
+                <button className="w-full p-4 rounded-xl bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 transition-all duration-200 text-left group">
+                  <div className="flex items-center gap-3">
+                    <Code size={18} className="text-green-400" />
+                    <div className="flex-1">
+                      <div className="text-white font-medium">Advanced Editor</div>
+                      <div className="text-xs text-neutral-400">Custom Modelfile creation</div>
+                    </div>
+                    <ChevronRight size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+                  </div>
+                </button>
+                
+                <button className="w-full p-4 rounded-xl bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 transition-all duration-200 text-left group">
+                  <div className="flex items-center gap-3">
+                    <Upload size={18} className="text-purple-400" />
+                    <div className="flex-1">
+                      <div className="text-white font-medium">Import Model</div>
+                      <div className="text-xs text-neutral-400">Load from file or URL</div>
+                    </div>
+                    <ChevronRight size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
 
   return (
     <div className="fixed inset-0 flex flex-col bg-black text-white font-inter h-full">
@@ -312,6 +564,58 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                </div>
+
+                {/* Modelfile Customization with Security Features */}
+                <div className="mb-4">
+                  <div className="text-sm font-bold text-neutral-400 mb-2 uppercase tracking-wider">Customize Model</div>
+                  
+                  {/* Security Info */}
+                  <div className="mb-2 text-xs text-neutral-500">
+                    🛡️ Secured: Max 10MB, 3/min rate limit, content validation
+                  </div>
+                  
+                  <Textarea
+                    value={modelfileContent}
+                    onChange={(e) => setModelfileContent(e.target.value)}
+                    placeholder="Example:
+FROM llama2
+SYSTEM You are a helpful assistant.
+TEMPLATE {{ .Prompt }}"
+                    className="w-full h-32 bg-neutral-900 border border-neutral-700 text-white p-2 rounded resize-none text-sm font-mono"
+                  />
+                  
+                  {/* Content Size Indicator */}
+                  <div className="flex justify-between items-center mt-1 text-xs text-neutral-500">
+                    <span>
+                      {(modelfileContent.length / 1024).toFixed(1)}KB / 10MB
+                    </span>
+                    <span>
+                      Valid directives: FROM, SYSTEM, TEMPLATE, PARAMETER
+                    </span>
+                  </div>
+                  
+                  {/* Error Display with Enhanced Styling */}
+                  {modelfileError && (
+                    <div className="mt-2 p-2 bg-red-900/20 border border-red-700/50 rounded text-xs text-red-400">
+                      {modelfileError}
+                    </div>
+                  )}
+                  
+                  <Button 
+                    onClick={handleModelfileUpdate}
+                    disabled={isUpdatingModelfile || !modelfileContent.trim()}
+                    className="w-full mt-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed h-9 text-sm"
+                  >
+                    {isUpdatingModelfile ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Creating Custom Model...
+                      </div>
+                    ) : (
+                      'Create Custom Model'
+                    )}
+                  </Button>
                 </div>
               </div>
               {/* Thread List */}
@@ -432,6 +736,13 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setPowerOverlayOpen(true)}
+                className="text-neutral-400 hover:text-yellow-400 p-1.5 rounded-md hover:bg-yellow-500/20 transition-all duration-200"
+                title="Power Center"
+              >
+                <Zap size={19} />
+              </button>
+              <button
                 className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-700 transition-colors"
                 title="Export Chat"
               >
@@ -490,73 +801,95 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
                   </div>
                 ) : (
                   <div className="px-4 py-6">
-                    {messages.map((message, index) => (
-                      <motion.div
-                        key={message.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={cn(
-                          "mb-6 flex",
-                          message.type === 'user' ? 'justify-end' : 'justify-start'
-                        )}
-                      >
-                        <div className={cn(
-                          "group max-w-[70%] flex gap-3",
-                          message.type === 'user' ? 'flex-row-reverse' : 'flex-row'
-                        )}>
-                          {/* Avatar */}
+                    {messages.map((message, index) => {
+                      const isCode = /```(\w+)?\n([\s\S]*?)\n```/.test(message.content); // Detect code block
+                      return (
+                        <motion.div
+                          key={message.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className={cn(
+                            "mb-6 flex",
+                            message.type === 'user' ? 'justify-end' : 'justify-start'
+                          )}
+                        >
                           <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0",
-                            message.type === 'assistant' 
-                              ? 'bg-gradient-to-r from-purple-500 to-pink-500' 
-                              : 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                            "group max-w-[70%] flex gap-3",
+                            message.type === 'user' ? 'flex-row-reverse' : 'flex-row'
                           )}>
-                            {message.type === 'assistant' ? 'AI' : 'U'}
-                          </div>
-
-                          {/* Message Content */}
-                          <div className={cn(
-                            "flex-1 min-w-0",
-                            message.type === 'user' ? 'text-right' : 'text-left'
-                          )}>
+                            {/* Avatar */}
                             <div className={cn(
-                              "inline-block p-4 rounded-2xl text-white leading-6 text-[15px]",
-                              message.type === 'user' 
-                                ? 'bg-blue-500/30 border-blue-500/30 rounded-br-md' 
-                                : 'bg-transparent rounded-bl-md'
+                              "w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0",
+                              message.type === 'assistant' 
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500' 
+                                : 'bg-gradient-to-r from-blue-500 to-cyan-500'
                             )}>
-                              {message.content}
-                              {isLoading && index === messages.length - 1 && message.type === 'assistant' && (
-                                <motion.span
-                                  animate={{ opacity: [1, 0] }}
-                                  transition={{ duration: 0.8, repeat: Infinity }}
-                                  className="inline-block w-2 h-5 bg-white ml-1"
-                                />
-                              )}
+                              {message.type === 'assistant' ? 'AI' : 'U'}
                             </div>
 
-                            {/* Timestamp */}
+                            {/* Message Content */}
                             <div className={cn(
-                              "flex items-center gap-2 mt-2 text-xs text-neutral-500",
-                              message.type === 'user' ? 'justify-end' : 'justify-start'
+                              "flex-1 min-w-0",
+                              message.type === 'user' ? 'text-right' : 'text-left'
                             )}>
-                              <span>
-                                {message.timestamp instanceof Date 
-                                  ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                  : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                }
-                              </span>
-                              {message.responseTime && (
-                                <span className="text-green-400">
-                                  {message.responseTime}ms
+                              <div className={cn(
+                                "inline-block p-4 rounded-2xl text-white leading-6 text-[15px]",
+                                message.type === 'user' 
+                                  ? 'bg-blue-500/30 border-blue-500/30 rounded-br-md' 
+                                  : 'bg-transparent rounded-bl-md'
+                              )}>
+                                {message.content}
+                                {isLoading && index === messages.length - 1 && message.type === 'assistant' && (
+                                  <motion.span
+                                    animate={{ opacity: [1, 0] }}
+                                    transition={{ duration: 0.8, repeat: Infinity }}
+                                    className="inline-block w-2 h-5 bg-white ml-1"
+                                  />
+                                )}
+                              </div>
+
+                              {/* Timestamp */}
+                              <div className={cn(
+                                "flex items-center gap-2 mt-2 text-xs text-neutral-500",
+                                message.type === 'user' ? 'justify-end' : 'justify-start'
+                              )}>
+                                <span>
+                                  {message.timestamp instanceof Date 
+                                    ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  }
                                 </span>
+                                {message.responseTime && (
+                                  <span className="text-green-400">
+                                    {message.responseTime}ms
+                                  </span>
+                                )}
+                              </div>
+                              {/* Code Run Button */}
+                              {isCode && message.type === 'assistant' && (
+                                <Button
+                                  onClick={() => handleRunCode(message.id, message.content.match(codeRegex)[2])}
+                                  className="mt-2 bg-green-500 hover:bg-green-600 text-white text-xs p-2 rounded"
+                                >
+                                  <PlayCircle size={14} /> Run Code
+                                </Button>
+                              )}
+                              {message.codeOutput && (
+                                <div className="mt-2 p-2 bg-neutral-800 rounded text-green-400 text-xs">
+                                  Output: {message.codeOutput}
+                                </div>
+                              )}
+                              {message.codeError && (
+                                <div className="mt-2 p-2 bg-red-500/20 rounded text-red-400 text-xs">
+                                  Error: {message.codeError}
+                                </div>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -650,6 +983,9 @@ const HybridChatInterface: React.FC<HybridChatInterfaceProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Power Overlay */}
+      <PowerOverlay />
     </div>
   )
 }

@@ -10,6 +10,35 @@ interface AIAssistantAPI {
   getOllamaModels: () => Promise<{ success: boolean; models: string[] }>
   pullModel: (modelName: string) => Promise<{ success: boolean }>
   deleteModel: (modelName: string) => Promise<{ success: boolean }>
+  
+  // NEW: Professional Modelfile update functionality
+  updateModelfile: (data: { 
+    modelName: string; 
+    content: string;
+    options?: {
+      customName?: string;
+      overwrite?: boolean;
+      validate?: boolean;
+    };
+  }) => Promise<{ 
+    success: boolean; 
+    message?: string; 
+    error?: string;
+    modelName?: string;
+    responseTime?: number;
+  }>
+
+  // NEW: Code execution (Desktop Commander)
+  execCode: (data: {
+    code: string;
+    lang?: 'js';
+  }) => Promise<{
+    success: boolean;
+    output?: string;
+    error?: string;
+    executionTime?: number;
+    lang?: string;
+  }>
 
   // ChromaDB service functions
   checkChromaStatus: () => Promise<{ connected: boolean; message: string; version?: string }>
@@ -36,6 +65,67 @@ interface AIAssistantAPI {
     timestamp?: string
     memoryContext?: any
     error?: string
+  }>
+
+  // Service metrics
+  getServiceMetrics: () => Promise<{
+    overall: number
+    performance: number
+    memory: number
+    temperature: number
+    uptime: number
+    responseTime: number
+    tokensPerSecond: number
+    errors: number
+    status: 'excellent' | 'good' | 'warning' | 'critical'
+    modelCount: number
+    recommendations: string[]
+    isM1Optimized: boolean
+    platform: string
+    serviceStatus: { ollama: boolean; chroma: boolean }
+  }>
+
+  // PHASE 2 FIX: Real-time performance metrics
+  getPerformanceMetrics: () => Promise<{
+    success: boolean
+    metrics?: {
+      cpu: {
+        usage: number
+        efficiency: number
+        performance: number
+        processes: {
+          electron: number
+          ollama: number
+          chroma: number
+          total: number
+        }
+      }
+      memory: {
+        total: number
+        used: number
+        free: number
+        pressure: number
+        swap: number
+      }
+      thermal: {
+        cpu: number
+        gpu: number
+        battery: number
+        powerMode: 'low' | 'balanced' | 'high'
+      }
+      processes: {
+        active: number
+        zombies: number
+        unrefed: number
+      }
+      score: number
+      timestamp: Date
+    }
+    recommendations?: string[]
+    isM1?: boolean
+    monitoring?: boolean
+    error?: string
+    message?: string
   }>
 
   // Memory functions

@@ -27,24 +27,21 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ className, onCodeGenerate
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [isLoadingModels, setIsLoadingModels] = useState(false)
 
-  // Load available models when component mounts
   useEffect(() => {
     const loadModels = async () => {
       setIsLoadingModels(true)
       try {
-        const models = await window.api.invoke('get-available-models')
-        setAvailableModels(models)
-
-        // Get best code model suggestion
-        const bestModel = await window.api.invoke('select-best-code-model')
-        setSelectedModel(bestModel)
+        const response = await window.api.getOllamaModels()
+        if (response.success && response.models) {
+          setAvailableModels(response.models)
+          setSelectedModel(response.models.find(m => m.includes('coder')) || response.models[0] || '')
+        }
       } catch (error) {
         console.error('Failed to load models:', error)
       } finally {
         setIsLoadingModels(false)
       }
     }
-
     loadModels()
   }, [])
 
@@ -56,15 +53,21 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ className, onCodeGenerate
     setError('')
 
     try {
-      // Call the backend service
-      const response = await window.api.invoke('generate-code', {
-        task,
-        language,
-        modelName: selectedModel
-      })
-
-      setGeneratedCode(response)
-      onCodeGenerated?.(response, language)
+      const prompt = `Generate ${language} code for: ${task}. Format as markdown code block (e.g., \`\`\`${language}\ncode\`\`\`).`;
+      const response = await window.api.chatWithAI({
+        message: prompt,
+        model: selectedModel,
+        history: [],
+        mode: 'chat'
+      });
+      const codeBlock = (response.response ?? response.message ?? '').match(/```(?:\w+)?\n([\s\S]*?)```/);
+      if (codeBlock) {
+        const code = codeBlock[1].trim();
+        setGeneratedCode(code);
+        onCodeGenerated?.(code, language);
+      } else {
+        throw new Error('No code block detected in response');
+      }
     } catch (error) {
       console.error('Code generation failed:', error)
       setError(`Error generating code: ${error instanceof Error ? error.message : String(error)}`)
@@ -73,6 +76,18 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ className, onCodeGenerate
     }
   }
 
+  const handleRunCode = () => {
+    if (generatedCode) {
+      window.api.execCode({ code: generatedCode, lang: language as 'js' })
+        .then((result: { success: boolean; output?: string; error?: string }) => {
+          const outputText = result.output ?? '';
+          setGeneratedCode(prev => `${prev}\n// Output: ${outputText}`);
+          if (result.error) setError(`Error: ${result.error}`);
+        })
+        .catch((err: { error?: string }) => setError(`Exec failed: ${err.error || 'Unknown error'}`));
+    }
+  };
+
   return (
     <Card className="bg-gray-800/80 border-gray-700/50 backdrop-blur-md overflow-hidden">
       <CardHeader className="pb-2">
@@ -80,7 +95,11 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ className, onCodeGenerate
           <Code size={20} className="text-blue-400" />
           Code Generator
           <div className="ml-auto flex items-center">
-            {isGenerating && <Pulsating className="text-blue-400" />}
+            {isGenerating && (
+              <Pulsating className="text-blue-400">
+                <span className="inline-block w-2 h-2 bg-current rounded-full" />
+              </Pulsating>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
@@ -165,12 +184,18 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ className, onCodeGenerate
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedCode)
-                  }}
+                  onClick={() => navigator.clipboard.writeText(generatedCode)}
                   className="h-6 px-2 text-xs text-gray-400 hover:text-white"
                 >
                   Copy
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRunCode}
+                  className="h-6 px-2 text-xs text-green-400 hover:text-green-300"
+                >
+                  <Play size={14} /> Run
                 </Button>
               </div>
               <pre className="bg-gray-900 p-4 rounded text-sm font-mono text-white overflow-auto max-h-64">
