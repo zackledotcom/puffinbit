@@ -40,9 +40,16 @@ export type {
 export { redditBotAgent } from './redditBotAgent'
 export type {
   BotConfig,
-  BotStats,
-  ProcessedMessage
+  BotStats
 } from './redditBotAgent'
+
+// From reddit.ts
+export { redditService } from './reddit'
+export type {
+  RedditCredentials,
+  RedditPost,
+  RedditComment
+} from './reddit'
 
 // From ollamaService.ts  
 export { ollamaService } from './ollamaService'
@@ -55,8 +62,6 @@ export * from './avatarService'
 export * from './crypto'
 export * from './memoryService'
 export * from './modelTuningService'
-export * from './reddit'
-export * from './redditAgent'
 
 // Selective exports to avoid conflicts
 export { 

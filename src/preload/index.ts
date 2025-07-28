@@ -1,37 +1,229 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-// import type { 
-//   FileSystemAPI, 
-//   DatabaseAPI, 
-//   WindowAPI, 
-//   AudioAPI 
-// } from '../../shared/types'; // Shared TypeScript interfaces - temporarily disabled
+import { z } from 'zod';
 
 // --------------------------------------------------
-// PHASE 1 FIX: Safe IPC Wrapper with Error Handling
+// PHASE 0: ZERO-TRUST IPC SECURITY LAYER
 // --------------------------------------------------
-const createSafeIPCHandler = (channel: string, timeout: number = 10000) => {
-  return async (...args: any[]) => {
+
+interface SecurityConfig {
+  maxRequestsPerMinute: number;
+  requestTimeoutMs: number;
+  maxPayloadSize: number;
+  allowedChannels: Set<string>;
+}
+
+class ZeroTrustIPCClient {
+  private requestCounts = new Map<string, { count: number; resetTime: number }>();
+  private activeRequests = new Set<string>();
+  private securityEvents: Array<{ type: string; channel: string; timestamp: number }> = [];
+  private config: SecurityConfig;
+
+  constructor() {
+    this.config = {
+      maxRequestsPerMinute: 120, // Increased for legitimate usage
+      requestTimeoutMs: 60000,   // 1 minute max
+      maxPayloadSize: 2 * 1024 * 1024, // 2MB max payload
+      allowedChannels: new Set([
+        // Core Ollama functions
+        'check-ollama-status', 'start-ollama', 'get-ollama-models', 'pull-model', 'delete-model',
+        'ollama:update-modelfile', 'ollama:exec',
+        // ChromaDB functions  
+        'check-chroma-status', 'start-chroma',
+        // Chat functions
+        'chat-with-ai', 'get-chat-metrics',
+        // Browser functions
+        'browser-create-session', 'browser-extract-context', 'browser-get-security-info', 'browser-clear-data',
+        // Service functions
+        'get-service-metrics', 'get-performance-metrics', 'get-health-status',
+        // Memory functions
+        'search-memory', 'umsl-store-memory', 'umsl-retrieve-context', 'umsl-advanced-search',
+        'umsl-create-thread', 'umsl-add-to-thread', 'umsl-get-thread',
+        // Model management
+        'umsl-register-model', 'umsl-load-model', 'umsl-unload-model', 'umsl-execute-model',
+        'umsl-get-model-stats', 'umsl-get-resource-usage', 'umsl-get-memory-stats',
+        'umsl-prefetch-models', 'umsl-update-resource-quota',
+        // Agent platform
+        'agent-create', 'agent-start', 'agent-stop', 'agent-delete', 'agent-get', 'agent-list',
+        'agent-get-status', 'agent-execute-task', 'agent-get-system-status',
+        // Plugin architecture
+        'plugin-install', 'plugin-uninstall', 'plugin-enable', 'plugin-disable', 'plugin-update',
+        'plugin-list-installed', 'plugin-get-state', 'plugin-search-registry', 'plugin-execute',
+        'plugin-get-config', 'plugin-set-config',
+        // File system
+        'fs-read-file', 'fs-write-file', 'fs-create-directory', 'fs-list-directory',
+        // MCP
+        'mcp:server-info', 'mcp:health-check', 'mcp:add-custom-server', 'mcp:remove-server',
+        // Analytics
+        'analytics:track',
+        // Debug (dev only)
+        'debug:ping', 'debug:get-state'
+      ])
+    };
+  }
+
+  /**
+   * Zero-trust IPC invoke with comprehensive validation
+   */
+  async secureInvoke(channel: string, ...args: any[]): Promise<any> {
+    // 1. Channel validation
+    if (!this.validateChannel(channel)) {
+      this.logSecurityEvent('unauthorized_channel', channel);
+      throw new Error(`Unauthorized channel: ${channel}`);
+    }
+
+    // 2. Rate limiting
+    if (!this.checkRateLimit(channel)) {
+      this.logSecurityEvent('rate_limit_exceeded', channel);
+      throw new Error(`Rate limit exceeded for: ${channel}`);
+    }
+
+    // 3. Payload size validation
+    const payload = JSON.stringify(args);
+    if (payload.length > this.config.maxPayloadSize) {
+      this.logSecurityEvent('payload_too_large', channel);
+      throw new Error(`Payload too large: ${payload.length} bytes`);
+    }
+
+    // 4. Input sanitization
+    const sanitizedArgs = this.sanitizeArguments(args);
+
+    // 5. Execute with timeout and tracking
+    const requestId = `${channel}_${Date.now()}_${Math.random()}`;
+    this.activeRequests.add(requestId);
+
     try {
-      console.log(`[IPC] Calling ${channel}...`);
-      
-      // Create timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error(`IPC timeout: ${channel} took longer than ${timeout}ms`)), timeout);
-      });
-
-      // Race between IPC call and timeout
       const result = await Promise.race([
-        ipcRenderer.invoke(channel, ...args),
-        timeoutPromise
+        ipcRenderer.invoke(channel, ...sanitizedArgs),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Request timeout: ${channel}`)), this.config.requestTimeoutMs)
+        )
       ]);
 
-      console.log(`[IPC] ✅ ${channel} completed successfully`);
+      console.log(`[SECURE-IPC] ✅ ${channel} completed`);
       return result;
-      
+
     } catch (error: any) {
-      console.error(`[IPC] ❌ ${channel} failed:`, error.message);
+      this.logSecurityEvent('request_failed', channel);
+      console.error(`[SECURE-IPC] ❌ ${channel} failed:`, error.message);
+      throw error;
+    } finally {
+      this.activeRequests.delete(requestId);
+    }
+  }
+
+  /**
+   * Validate channel against whitelist
+   */
+  private validateChannel(channel: string): boolean {
+    return this.config.allowedChannels.has(channel);
+  }
+
+  /**
+   * Rate limiting with per-channel tracking
+   */
+  private checkRateLimit(channel: string): boolean {
+    const now = Date.now();
+    const resetTime = now + (60 * 1000); // 1 minute
+    
+    let rateData = this.requestCounts.get(channel);
+    
+    if (!rateData || now > rateData.resetTime) {
+      this.requestCounts.set(channel, { count: 1, resetTime });
+      return true;
+    }
+
+    if (rateData.count >= this.config.maxRequestsPerMinute) {
+      return false;
+    }
+
+    rateData.count++;
+    return true;
+  }
+
+  /**
+   * Comprehensive input sanitization
+   */
+  private sanitizeArguments(args: any[]): any[] {
+    return args.map(arg => this.sanitizeValue(arg));
+  }
+
+  private sanitizeValue(value: any): any {
+    if (typeof value === 'string') {
+      // Remove script tags, limit length, encode dangerous characters
+      return value
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/javascript:/gi, '')
+        .slice(0, 50000) // Reasonable string limit
+        .trim();
+    }
+    
+    if (Array.isArray(value)) {
+      return value.slice(0, 1000).map(item => this.sanitizeValue(item)); // Limit array size
+    }
+    
+    if (typeof value === 'object' && value !== null) {
+      const sanitized: any = {};
+      let keyCount = 0;
       
-      // Return a consistent error structure
+      for (const [key, val] of Object.entries(value)) {
+        if (keyCount >= 100) break; // Limit object size
+        if (typeof key === 'string' && key.length < 200) {
+          sanitized[key] = this.sanitizeValue(val);
+          keyCount++;
+        }
+      }
+      return sanitized;
+    }
+    
+    if (typeof value === 'number') {
+      // Ensure valid numbers
+      return isNaN(value) || !isFinite(value) ? 0 : value;
+    }
+    
+    return value;
+  }
+
+  /**
+   * Security event logging
+   */
+  private logSecurityEvent(type: string, channel: string): void {
+    this.securityEvents.push({
+      type,
+      channel,
+      timestamp: Date.now()
+    });
+
+    // Limit event history
+    if (this.securityEvents.length > 1000) {
+      this.securityEvents = this.securityEvents.slice(-500);
+    }
+
+    console.warn(`[SECURITY] ${type} for channel: ${channel}`);
+  }
+
+  /**
+   * Get security metrics
+   */
+  getSecurityMetrics() {
+    return {
+      activeRequests: this.activeRequests.size,
+      recentEvents: this.securityEvents.filter(e => Date.now() - e.timestamp < 300000), // Last 5 minutes
+      rateLimitStatus: Object.fromEntries(this.requestCounts)
+    };
+  }
+}
+
+const secureIPC = new ZeroTrustIPCClient();
+
+// --------------------------------------------------
+// PHASE 1 FIX: Enhanced Safe IPC Wrapper
+// --------------------------------------------------
+const createSafeIPCHandler = (channel: string, timeout: number = 30000) => {
+  return async (...args: any[]) => {
+    try {
+      return await secureIPC.secureInvoke(channel, ...args);
+    } catch (error: any) {
+      // Return consistent error structure
       return {
         success: false,
         error: error.message || `IPC call failed: ${channel}`,

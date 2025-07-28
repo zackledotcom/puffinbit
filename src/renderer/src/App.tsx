@@ -2,10 +2,16 @@ import React, { useState, useCallback, useEffect } from 'react'
 
 // Core Chat Components
 import PuffinAssistant from './components/chat/PuffinAssistant'
-import PremiumChatInterface from './components/chat/PremiumChatInterface'
 import HybridChatInterface from './components/chat/HybridChatInterface'
 import { EfficientSidebar } from './components/layout/EfficientSidebar'
+import BottomBar from './components/layout/BottomBar'
 import SimpleTest from './components/SimpleTest'
+
+// Browser Components
+import BrowserChat from './components/browser/BrowserChat'
+
+// Modals & Overlays
+import SystemStatusOverlay from './components/overlays/SystemStatusOverlay'
 
 // Assistant UI Components  
 import RealAssistantUI from './components/assistant-ui/RealAssistantUI'
@@ -23,11 +29,13 @@ interface AppState {
   showSystemStatus: boolean
   showAgentManager: boolean
   showAdvancedMemory: boolean
+  showAnalytics: boolean // Added for BottomBar
   selectedModel: string
   availableModels: string[] // Added for dynamic
   theme: 'light' | 'dark' | 'system'
   showDemo: boolean
-  testAssistantUI: boolean  // NEW: Toggle for testing Assistant UI
+  showBrowser: boolean // Added for browser mode
+  currentView: 'chat' | 'browser' | 'demo' // Added for view management
 }
 
 // PHASE 1 FIX: Enhanced Error Boundary with IPC Safety
@@ -95,16 +103,24 @@ const App: React.FC = () => {
     showSystemStatus: false,
     showAgentManager: false,
     showAdvancedMemory: false,
+    showAnalytics: false,
     selectedModel: 'tinydolphin:latest',
     availableModels: [], // Dynamic load
     theme: 'system',
     showDemo: false,
-    testAssistantUI: false  // NEW: Start with your working interface
+    showBrowser: false,
+    currentView: 'chat'
   })
 
   // PHASE 1 FIX: IPC Safety and API Availability Check
   const [apiReady, setApiReady] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
+  
+  // Move all remaining useState hooks to top level
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [stats, setStats] = useState({ responseTime: 234, tokens: 1247, modelLoad: 89 })
+  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null)
 
   // Check window.api availability on mount
   useEffect(() => {
@@ -143,42 +159,6 @@ const App: React.FC = () => {
     checkAPI()
   }, [])
 
-  // Show loading state while API initializes
-  if (!apiReady) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#1a1a1a] text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4 mx-auto"></div>
-          <h2 className="text-xl font-semibold mb-2">Initializing Puffer AI</h2>
-          {apiError ? (
-            <div className="bg-red-900/30 border border-red-500 rounded-lg p-4 max-w-md">
-              <p className="text-red-400 text-sm mb-2">IPC Connection Error:</p>
-              <p className="text-red-300 text-xs">{apiError}</p>
-              <p className="text-gray-400 text-xs mt-2">Retrying connection...</p>
-            </div>
-          ) : (
-            <p className="text-gray-400">Loading IPC bridge...</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Add state for PremiumChatInterface
-  type MessageType = 'user' | 'assistant' | 'system';
-  interface ChatMessage {
-    id: string | number;
-    type: MessageType;
-    content: string;
-    timestamp: Date;
-    model?: string;
-    responseTime?: number;
-  }
-
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false)
-  const [stats, setStats] = useState({ responseTime: 234, tokens: 1247, modelLoad: 89 })
-
   // PHASE 1 FIX: Load dynamic models with proper error handling
   useEffect(() => {
     const loadModels = async () => {
@@ -215,6 +195,37 @@ const App: React.FC = () => {
     loadModels()
   }, [apiReady]) // Only load models after API is ready
 
+  // Show loading state while API initializes
+  if (!apiReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#1a1a1a] text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4 mx-auto"></div>
+          <h2 className="text-xl font-semibold mb-2">Initializing Puffer AI</h2>
+          {apiError ? (
+            <div className="bg-red-900/30 border border-red-500 rounded-lg p-4 max-w-md">
+              <p className="text-red-400 text-sm mb-2">IPC Connection Error:</p>
+              <p className="text-red-300 text-xs">{apiError}</p>
+              <p className="text-gray-400 text-xs mt-2">Retrying connection...</p>
+            </div>
+          ) : (
+            <p className="text-gray-400">Loading IPC bridge...</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Add state for PremiumChatInterface
+  type MessageType = 'user' | 'assistant' | 'system';
+  interface ChatMessage {
+    id: string | number;
+    type: MessageType;
+    content: string;
+    timestamp: Date;
+    model?: string;
+    responseTime?: number;
+  }
   // REAL MESSAGE HANDLING - Connect to actual Puffin API
   const handleSendMessage = async (content: string) => {
     setIsLoading(true);
@@ -271,8 +282,6 @@ const App: React.FC = () => {
     }
   };
 
-  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null)
-
   const updateState = (updates: Partial<AppState>) => {
     setState((prev) => ({ ...prev, ...updates }))
   }
@@ -315,21 +324,65 @@ const App: React.FC = () => {
               </div>
             }
           >
-            {state.showDemo ? (
+            {state.currentView === 'demo' ? (
               <SimpleTest />
+            ) : state.currentView === 'browser' ? (
+              <BrowserChat
+                onClose={() => updateState({ currentView: 'chat', showBrowser: false })}
+                initialUrl="https://www.google.com"
+              />
             ) : (
               <div className="h-full flex flex-col">
-                {/* Model indicator */}
-                <div className="bg-[#1a1a1a] border-b border-[#333] px-4 py-2">
-                  <div className="flex items-center justify-between max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        Model: {state.selectedModel}
-                      </span>
+                {/* View Navigation */}
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between max-w-6xl mx-auto">
+                    <div className="flex items-center gap-4">
+                      {/* View Toggle Buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateState({ currentView: 'chat', showBrowser: false })}
+                          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                            state.currentView === 'chat'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          💬 Chat
+                        </button>
+                        <button
+                          onClick={() => updateState({ currentView: 'browser', showBrowser: true })}
+                          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                            state.currentView === 'browser'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          🌐 AI Browser
+                        </button>
+                        <button
+                          onClick={() => updateState({ currentView: 'demo', showDemo: true })}
+                          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                            state.currentView === 'demo'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+                              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          🧪 Demo
+                        </button>
+                      </div>
                       
+                      {/* Model indicator */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Model: {state.selectedModel}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
                       {/* Theme Toggle */}
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500">Theme:</span>
                         <button
                           onClick={() => updateState({ 
@@ -341,59 +394,41 @@ const App: React.FC = () => {
                         </button>
                       </div>
                       
-                      {/* HYBRID ASSISTANT UI TOGGLE */}
-                      <div className="flex items-center gap-2 ml-4">
-                        <span className="text-xs text-gray-500">Interface:</span>
-                        <button
-                          onClick={() => updateState({ 
-                            testAssistantUI: !state.testAssistantUI 
-                          })}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            state.testAssistantUI 
-                              ? 'bg-purple-500 text-white' 
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                          }`}
-                        >
-                          {state.testAssistantUI ? '🔥 Hybrid' : '🔧 Premium'}
-                        </button>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">
+                        🔒 Privacy-first • Local processing
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-500">
-                      🔒 Privacy-first • Local processing
                     </div>
                   </div>
                 </div>
                 
-                {/* Chat Interface - Toggle between Premium (your 7hr work) and Hybrid (Premium + Assistant UI) */}
+                {/* Chat Interface */}
                 <div className="flex-1 min-h-0">
-                  {state.showDemo ? (
-                    <SimpleTest />
-                  ) : state.testAssistantUI ? (
-                    // HYBRID: Your beautiful design + Assistant UI superpowers
-                    <HybridChatInterface
-                      selectedModel={state.selectedModel}
-                      onModelChange={(model) => updateState({ selectedModel: model })}
-                      onSendMessage={handleSendMessage}
-                      messages={messages}
-                      isLoading={isLoading}
-                      stats={stats}
-                    />
-                  ) : (
-                    // YOUR WORKING PREMIUM INTERFACE - Preserved exactly as is
-                    <PremiumChatInterface
-                      selectedModel={state.selectedModel}
-                      onModelChange={(model) => updateState({ selectedModel: model })}
-                      onSendMessage={handleSendMessage}
-                      messages={messages}
-                      isLoading={isLoading}
-                      stats={stats}
-                    />
-                  )}
+                  <HybridChatInterface
+                    selectedModel={state.selectedModel}
+                    onModelChange={(model) => updateState({ selectedModel: model })}
+                    onSendMessage={handleSendMessage}
+                    messages={messages}
+                    isLoading={isLoading}
+                    stats={stats}
+                  />
                 </div>
+
+                {/* Bottom Bar */}
+                <BottomBar
+                  onOpenSettings={() => updateState({ showSettings: true })}
+                  onOpenAnalytics={() => updateState({ showAnalytics: true })}
+                />
               </div>
             )}
           </ErrorBoundary>
         </main>
+
+        {/* Analytics Panel Modal */}
+        {state.showAnalytics && (
+          <SystemStatusOverlay 
+            onClose={() => updateState({ showAnalytics: false })}
+          />
+        )}
       </div>
     </ToastProvider>
   )

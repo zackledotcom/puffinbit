@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils'
 
 interface Message {
   id: string
-  type: 'user' | 'ai' | 'system'
+  role: 'user' | 'assistant' | 'system'  // Changed from 'type' to 'role'
   content: string
-  timestamp: Date
+  createdAt: number  // Changed from 'timestamp: Date' to 'createdAt: number'
   isStreaming?: boolean
   metadata?: {
     model?: string
@@ -94,8 +94,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onCorrection, on
     )
   }
 
-  const isUser = message.type === 'user'
-  const isSystem = message.type === 'system'
+  const isUser = message.role === 'user'
+  const isSystem = message.role === 'system'
 
   return (
     <div
@@ -138,8 +138,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onCorrection, on
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
-              {message.timestamp instanceof Date && !isNaN(message.timestamp.getTime()) 
-                ? message.timestamp.toLocaleTimeString() 
+              {message.createdAt 
+                ? new Date(message.createdAt).toLocaleTimeString() 
                 : new Date().toLocaleTimeString()}
             </span>
           </div>

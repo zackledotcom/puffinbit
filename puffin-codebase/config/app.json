@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "environment": "development",
+  "telemetry": {
+    "enabled": false,
+    "collectUsageStats": false,
+    "collectErrorReports": true,
+    "collectPerformanceMetrics": false,
+    "anonymizeData": true,
+    "retentionDays": 30
+  },
+  "performance": {
+    "maxMemoryUsageMB": 2048,
+    "enableGPU": false,
+    "maxConcurrentRequests": 5,
+    "requestTimeoutMs": 30000,
+    "enableCaching": true,
+    "cacheMaxSizeMB": 100,
+    "gcStrategy": "balanced"
+  },
+  "ai": {
+    "defaultModel": "tinydolphin:latest",
+    "defaultTemperature": 0.7,
+    "maxTokens": 2048,
+    "enableMemoryEnrichment": true,
+    "memorySearchLimit": 10,
+    "memoryThreshold": 0.7,
+    "enableStreaming": false,
+    "modelTimeout": 60000
+  },
+  "security": {
+    "enableAgentSafety": true,
+    "allowDangerousOperations": false,
+    "maxFileSize": 104857600,
+    "allowedFileTypes": ["txt", "md", "json", "js", "ts", "py"],
+    "enableInputValidation": true,
+    "logSecurityEvents": true,
+    "sessionTimeoutMs": 3600000
+  },
+  "ui": {
+    "theme": "system",
+    "language": "en",
+    "fontSize": "medium",
+    "enableAnimations": true,
+    "enableSounds": false,
+    "autoSave": true,
+    "autoSaveIntervalMs": 30000,
+    "maxChatHistory": 1000
+  },
+  "services": {
+    "ollama": {
+      "enabled": true,
+      "url": "http://127.0.0.1:11434",
+      "timeout": 30000,
+      "autoStart": true,
+      "healthCheckInterval": 30000
+    },
+    "chroma": {
+      "enabled": true,
+      "url": "http://localhost:8000",
+      "timeout": 15000,
+      "autoStart": true,
+      "healthCheckInterval": 30000
+    }
+  },
+  "logging": {
+    "level": "info",
+    "enableFileLogging": true,
+    "enableConsoleLogging": true,
+    "maxLogFiles": 10,
+    "maxLogSizeMB": 10,
+    "logDirectory": "logs",
+    "enablePerformanceLogging": true
+  },
+  "createdAt": "2025-07-01T16:39:00.000Z",
+  "updatedAt": "2025-07-01T16:39:00.000Z",
+  "configVersion": "2.0.0"
+}

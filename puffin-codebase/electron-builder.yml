@@ -1,0 +1,63 @@
+appId: com.electron.puffin
+productName: Puffin AI Assistant
+directories:
+  output: dist
+  app: out
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/@types/**/*"
+  - "!node_modules/.cache/**/*"
+  - "!coverage/**/*"
+  - "!src/**/*"
+  - "!test/**/*"
+  - "!jest.config.json"
+  - "!tsconfig*.json"
+
+mac:
+  target: 
+    - target: dmg
+      arch: 
+        - x64
+        - arm64
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  
+win:
+  target: nsis
+  icon: resources/icon.ico
+  
+linux:
+  target: AppImage
+  icon: resources/icon.png
+  category: Development
+
+dmg:
+  title: "Puffin AI Assistant"
+  icon: resources/icon.icns
+  backgroundColor: "#1a1a1c"
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: "Puffin AI Assistant"
+
+publish:
+  provider: github
+  owner: puffer
+  repo: puffin-ai-assistant
+  private: false

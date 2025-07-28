@@ -1,0 +1,263 @@
+import React, { useState, useCallback } from 'react'
+
+// Core Chat Components
+import PuffinAssistant from './components/chat/PuffinAssistant'
+import PremiumChatInterface from './components/chat/PremiumChatInterface'
+import { EfficientSidebar } from './components/layout/EfficientSidebar'
+import SimpleTest from './components/SimpleTest'
+
+// Assistant UI Components  
+import RealAssistantUI from './components/assistant-ui/RealAssistantUI'
+
+// Global Systems
+import { ToastProvider } from './components/ui/toast'
+
+import './globals.css'
+
+interface AppState {
+  showLeftSidebar: boolean
+  showSettings: boolean
+  showDeveloper: boolean
+  showSystemStatus: boolean
+  showAgentManager: boolean
+  showAdvancedMemory: boolean
+  selectedModel: string
+  theme: 'light' | 'dark' | 'system'
+  showDemo: boolean
+}
+
+// Simple error boundary
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Component Error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <div className="p-4 bg-red-50 border border-red-200 rounded">
+            <h3 className="text-red-800 font-semibold">Component Error</h3>
+            <p className="text-red-600 text-sm mt-1">{this.state.error?.message}</p>
+          </div>
+        )
+      )
+    }
+
+    return <>{this.props.children}</>
+  }
+}
+
+const App: React.FC = () => {
+  const [state, setState] = useState<AppState>({
+    showLeftSidebar: false,
+    showSettings: false,
+    showDeveloper: false,
+    showSystemStatus: false,
+    showAgentManager: false,
+    showAdvancedMemory: false,
+    selectedModel: 'tinydolphin:latest',
+    theme: 'system',
+    showDemo: false
+  })
+
+  // Add state for PremiumChatInterface
+  type MessageType = 'user' | 'assistant' | 'system';
+  interface ChatMessage {
+    id: string | number;
+    type: MessageType;
+    content: string;
+    timestamp: Date;
+    model?: string;
+    responseTime?: number;
+  }
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false)
+  const [stats, setStats] = useState({ responseTime: 234, tokens: 1247, modelLoad: 89 })
+
+  // REAL MESSAGE HANDLING - Connect to actual Puffin API
+  const handleSendMessage = async (content: string) => {
+    setIsLoading(true);
+    const startTime = Date.now();
+    
+    // Add user message immediately
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content,
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    try {
+      // Call the REAL Puffin API
+      const response = await window.api.chatWithAI({
+        message: content,
+        model: state.selectedModel,
+        history: messages.map(m => ({ role: m.type, content: m.content })),
+        mode: 'chat'
+      });
+      
+      if (response.success) {
+        const responseTime = Date.now() - startTime;
+        const aiMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: response.message || response.response || 'No response generated',
+          timestamp: new Date(),
+          model: state.selectedModel,
+          responseTime
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+        setStats(prev => ({ ...prev, responseTime }));
+      } else {
+        throw new Error(response.message || 'AI service error');
+      }
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        type: 'assistant',
+        content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure your AI services are running.`,
+        timestamp: new Date(),
+        model: state.selectedModel,
+        responseTime: Date.now() - startTime
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null)
+
+  const updateState = (updates: Partial<AppState>) => {
+    setState((prev) => ({ ...prev, ...updates }))
+  }
+
+  const toggleSidebar = () => {
+    console.log('Toggling sidebar from:', state.showLeftSidebar, 'to:', !state.showLeftSidebar)
+    updateState({ showLeftSidebar: !state.showLeftSidebar })
+  }
+
+  const handleLeftEdgeHover = () => {
+    if (!state.showLeftSidebar) {
+      const timeout = setTimeout(() => {
+        updateState({ showLeftSidebar: true })
+      }, 300)
+      setHoverTimeout(timeout)
+    }
+  }
+
+  const handleLeftEdgeLeave = () => {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout)
+      setHoverTimeout(null)
+    }
+  }
+
+  const handleNewChat = () => {
+    console.log('🆕 New chat initiated')
+  }
+
+  return (
+    <ToastProvider>
+      <div className="flex h-screen bg-[#1a1a1a] overflow-hidden">
+        {/* Left Edge Hover Trigger */}
+        <div
+          className={`absolute left-0 top-0 w-1 h-full z-50 ${!state.showLeftSidebar ? 'cursor-pointer' : ''}`}
+          onMouseEnter={handleLeftEdgeHover}
+          onMouseLeave={handleLeftEdgeLeave}
+        />
+
+        {/* Clean Sidebar - DISABLED for PremiumChatInterface */}
+        <div
+          className={`
+          transition-all duration-300 ease-out 
+          w-0
+          bg-[#1a1a1a] border-r border-[#333] overflow-hidden
+        `}
+        >
+        </div>
+
+        {/* Main Area */}
+        <main className="flex-1 flex flex-col min-w-0 relative">
+          <ErrorBoundary
+            fallback={
+              <div className="flex-1 bg-red-50 flex items-center justify-center text-red-600">
+                Interface Error
+              </div>
+            }
+          >
+            {state.showDemo ? (
+              <SimpleTest />
+            ) : (
+              <div className="h-full flex flex-col">
+                {/* Model indicator */}
+                <div className="bg-[#1a1a1a] border-b border-[#333] px-4 py-2">
+                  <div className="flex items-center justify-between max-w-2xl mx-auto">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Model: {state.selectedModel}
+                      </span>
+                      
+                      {/* Theme Toggle */}
+                      <div className="flex items-center gap-2 ml-4">
+                        <span className="text-xs text-gray-500">Theme:</span>
+                        <button
+                          onClick={() => updateState({ 
+                            theme: state.theme === 'light' ? 'dark' : 'light' 
+                          })}
+                          className="px-2 py-1 text-xs rounded transition-colors bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                        >
+                          {state.theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-500">
+                      🔒 Privacy-first • Local processing
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Chat Interface - Premium with REAL backend */}
+                <div className="flex-1 min-h-0">
+                  {state.showDemo ? (
+                    <SimpleTest />
+                  ) : (
+                    <PremiumChatInterface
+                      selectedModel={state.selectedModel}
+                      onModelChange={(model) => updateState({ selectedModel: model })}
+                      onSendMessage={handleSendMessage}
+                      messages={messages}
+                      isLoading={isLoading}
+                      stats={stats}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </ErrorBoundary>
+        </main>
+      </div>
+    </ToastProvider>
+  )
+}
+
+export default App
