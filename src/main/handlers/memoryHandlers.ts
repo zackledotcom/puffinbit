@@ -1,11 +1,13 @@
 /**
- * Memory IPC Handlers - Semantic memory and search functionality
- * Uses dependency injection for SemanticMemoryEngine
+ * Enhanced Memory IPC Handlers - Optimized semantic memory and analytics
+ * Enhanced with ChromaDB optimizations and user controls
  */
 
 import { ipcMain } from 'electron';
 import { DependencyContainer } from '../services/DependencyContainer';
-import { safeLog, safeError } from '../utils/safeLogger';
+import { safeLog, safeError, safeInfo } from '../utils/safeLogger';
+import { unifiedMemoryManager, MemoryItem, SearchOptions, MemoryOptimizationConfig } from '../core/unifiedMemory';
+import { chromaService } from '../services/chromaService';
 
 export function registerMemoryHandlers(
   container: DependencyContainer,
@@ -13,11 +15,10 @@ export function registerMemoryHandlers(
 ): void {
 
   /**
-   * Search semantic memory
+   * Enhanced search with analytics
    */
   ipcMain.handle('search-memory', async (_, query: string, limit: number = 5) => {
     try {
-      // Input validation
       if (typeof query !== 'string' || !query.trim()) {
         return { success: false, error: 'Query must be a non-empty string' };
       }
@@ -27,13 +28,17 @@ export function registerMemoryHandlers(
       }
 
       const sanitizedQuery = Security.sanitizeInput(query.trim());
-      const semanticMemory = container.get('semanticMemory');
       
-      const results = await semanticMemory.advancedSearch(sanitizedQuery, { limit });
+      // Use enhanced unified memory manager
+      const results = await unifiedMemoryManager.semanticSearch(sanitizedQuery, { limit });
       
       return {
         success: true,
-        results,
+        results: results.items,
+        analytics: results.analytics,
+        searchTime: results.searchTime,
+        cacheHit: results.cacheHit,
+        totalFound: results.totalFound,
         query: sanitizedQuery,
         limit
       };
@@ -44,27 +49,44 @@ export function registerMemoryHandlers(
   });
 
   /**
-   * Store memory in semantic memory engine
+   * Store memory with enhanced metadata
    */
   ipcMain.handle('umsl-store-memory', async (_, content: string, type: string, metadata: any = {}) => {
     try {
-      // Input validation
       if (typeof content !== 'string' || !content.trim()) {
         return { success: false, error: 'Content must be a non-empty string' };
       }
 
-      const validTypes = ['conversation', 'document', 'code', 'task', 'agent_state'];
+      const validTypes = ['conversation', 'document', 'code', 'task', 'agent_state', 'system'];
       if (!validTypes.includes(type)) {
         return { success: false, error: `Type must be one of: ${validTypes.join(', ')}` };
       }
 
       const sanitizedContent = Security.sanitizeInput(content);
-      const validType = type as 'conversation' | 'document' | 'code' | 'task' | 'agent_state';
       
-      const semanticMemory = container.get('semanticMemory');
-      const memoryId = await semanticMemory.storeMemory(sanitizedContent, validType, metadata);
+      const memoryItem: MemoryItem = {
+        id: `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: type as MemoryItem['type'],
+        content: sanitizedContent,
+        metadata: {
+          ...metadata,
+          stored_via: 'ipc_handler',
+          content_length: sanitizedContent.length
+        },
+        timestamp: new Date().toISOString(),
+        tags: metadata.tags || [],
+        priority: metadata.priority || 'medium',
+        source: metadata.source || 'user',
+        accessCount: 0
+      };
       
-      return { success: true, memoryId };
+      const result = await unifiedMemoryManager.storeMemory(memoryItem);
+      
+      return { 
+        success: result.success, 
+        memoryId: memoryItem.id,
+        error: result.error 
+      };
     } catch (error: any) {
       safeError('❌ umsl-store-memory error:', error);
       return { success: false, error: error.message };
@@ -72,41 +94,39 @@ export function registerMemoryHandlers(
   });
 
   /**
-   * Retrieve context from semantic memory
+   * Enhanced advanced search with comprehensive options
    */
-  ipcMain.handle('umsl-retrieve-context', async (_, query: string, options: any = {}) => {
+  ipcMain.handle('umsl-advanced-search', async (_, query: string, options: SearchOptions = {}) => {
     try {
       if (typeof query !== 'string' || !query.trim()) {
         return { success: false, error: 'Query must be a non-empty string' };
       }
 
       const sanitizedQuery = Security.sanitizeInput(query.trim());
-      const semanticMemory = container.get('semanticMemory');
       
-      const context = await semanticMemory.retrieveContext(sanitizedQuery, options);
+      // Validate and sanitize search options
+      const searchOptions: SearchOptions = {
+        limit: Math.min(options.limit || 10, 100),
+        threshold: options.threshold,
+        type: options.type,
+        tags: options.tags,
+        timeRange: options.timeRange,
+        includeEmbeddings: options.includeEmbeddings || false,
+        priority: options.priority,
+        sortBy: options.sortBy || 'relevance',
+        filterByAccess: options.filterByAccess
+      };
       
-      return { success: true, context };
-    } catch (error: any) {
-      safeError('❌ umsl-retrieve-context error:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  /**
-   * Advanced search with filters
-   */
-  ipcMain.handle('umsl-advanced-search', async (_, query: string, filters: any = {}) => {
-    try {
-      if (typeof query !== 'string' || !query.trim()) {
-        return { success: false, error: 'Query must be a non-empty string' };
-      }
-
-      const sanitizedQuery = Security.sanitizeInput(query.trim());
-      const semanticMemory = container.get('semanticMemory');
+      const results = await unifiedMemoryManager.semanticSearch(sanitizedQuery, searchOptions);
       
-      const results = await semanticMemory.advancedSearch(sanitizedQuery, filters);
-      
-      return { success: true, results };
+      return { 
+        success: true, 
+        results: results.items,
+        analytics: results.analytics,
+        searchTime: results.searchTime,
+        cacheHit: results.cacheHit,
+        totalFound: results.totalFound
+      };
     } catch (error: any) {
       safeError('❌ umsl-advanced-search error:', error);
       return { success: false, error: error.message };
@@ -114,18 +134,265 @@ export function registerMemoryHandlers(
   });
 
   /**
-   * Create conversation thread
+   * Get comprehensive memory analytics
    */
-  ipcMain.handle('umsl-create-thread', async (_, message: string, metadata: any = {}) => {
+  ipcMain.handle('umsl-get-memory-analytics', async () => {
     try {
-      if (typeof message !== 'string' || !message.trim()) {
-        return { success: false, error: 'Message must be a non-empty string' };
+      const [stats, chromaAnalytics] = await Promise.all([
+        unifiedMemoryManager.getStats(),
+        chromaService.getMemoryAnalytics()
+      ]);
+      
+      return { 
+        success: true, 
+        stats,
+        chromaAnalytics,
+        config: unifiedMemoryManager.getConfig()
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-get-memory-analytics error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Vacuum/optimize memory storage
+   */
+  ipcMain.handle('umsl-vacuum-memory', async (_, dataPath?: string) => {
+    try {
+      safeInfo('🧹 Starting memory vacuum operation...');
+      
+      const [vacuumResult, optimizeResult] = await Promise.all([
+        chromaService.vacuum(dataPath),
+        unifiedMemoryManager.optimize()
+      ]);
+      
+      return {
+        success: vacuumResult.success && optimizeResult.success,
+        vacuumResult,
+        optimizeResult,
+        message: 'Memory optimization completed'
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-vacuum-memory error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Configure HNSW parameters
+   */
+  ipcMain.handle('umsl-configure-hnsw', async (_, collectionName: string, config: any) => {
+    try {
+      if (typeof collectionName !== 'string' || !collectionName.trim()) {
+        return { success: false, error: 'Collection name must be a non-empty string' };
       }
 
-      const sanitizedMessage = Security.sanitizeInput(message.trim());
-      const semanticMemory = container.get('semanticMemory');
+      const hnswConfig = {
+        ef_search: config.ef_search || 50,
+        ef_construction: config.ef_construction || 200,
+        M: config.M || 16
+      };
+
+      const result = await chromaService.configureHNSW(collectionName, hnswConfig);
       
-      const threadId = await semanticMemory.createConversationThread(sanitizedMessage, metadata);
+      return result;
+    } catch (error: any) {
+      safeError('❌ umsl-configure-hnsw error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Update memory optimization configuration
+   */
+  ipcMain.handle('umsl-update-config', async (_, newConfig: Partial<MemoryOptimizationConfig>) => {
+    try {
+      unifiedMemoryManager.updateConfig(newConfig);
+      
+      return { 
+        success: true, 
+        config: unifiedMemoryManager.getConfig(),
+        message: 'Memory configuration updated successfully'
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-update-config error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Clear memory cache
+   */
+  ipcMain.handle('umsl-clear-cache', async () => {
+    try {
+      await chromaService.clearCache();
+      await unifiedMemoryManager.cleanup();
+      
+      return { 
+        success: true, 
+        message: 'Memory cache cleared successfully' 
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-clear-cache error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Get cache hit rate and performance metrics
+   */
+  ipcMain.handle('umsl-get-performance-metrics', async () => {
+    try {
+      const cacheHitRate = chromaService.getCacheHitRate();
+      const avgLatency = chromaService.getAverageLatency();
+      const stats = await unifiedMemoryManager.getStats();
+      
+      return {
+        success: true,
+        metrics: {
+          cacheHitRate,
+          avgLatency,
+          storageStats: stats
+        }
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-get-performance-metrics error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Retrieve specific memory item
+   */
+  ipcMain.handle('umsl-retrieve-memory', async (_, memoryId: string) => {
+    try {
+      if (typeof memoryId !== 'string' || !memoryId.trim()) {
+        return { success: false, error: 'Memory ID must be a non-empty string' };
+      }
+
+      const memoryItem = await unifiedMemoryManager.retrieveMemory(memoryId);
+      
+      return { 
+        success: true, 
+        memoryItem,
+        found: memoryItem !== null
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-retrieve-memory error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Get ChromaDB collections info
+   */
+  ipcMain.handle('umsl-get-collections', async () => {
+    try {
+      const result = await chromaService.getCollections();
+      
+      if (result.success) {
+        // Get additional analytics for each collection
+        const collectionsWithStats = await Promise.all(
+          (result.collections || []).map(async (collection) => {
+            try {
+              const analytics = await chromaService.getMemoryAnalytics();
+              const collectionStats = analytics.collections.find(c => c.name === collection.name);
+              
+              return {
+                ...collection,
+                stats: collectionStats || { count: 0, size: 0, memoryUsage: 0 }
+              };
+            } catch {
+              return {
+                ...collection,
+                stats: { count: 0, size: 0, memoryUsage: 0 }
+              };
+            }
+          })
+        );
+
+        return {
+          success: true,
+          collections: collectionsWithStats
+        };
+      }
+      
+      return result;
+    } catch (error: any) {
+      safeError('❌ umsl-get-collections error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Create optimized collection with HNSW parameters
+   */
+  ipcMain.handle('umsl-create-collection', async (_, name: string, metadata?: any, hnswConfig?: any) => {
+    try {
+      if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'Collection name must be a non-empty string' };
+      }
+
+      const sanitizedName = Security.sanitizeInput(name.trim());
+      const result = await chromaService.createCollection(sanitizedName, metadata, hnswConfig);
+      
+      return result;
+    } catch (error: any) {
+      safeError('❌ umsl-create-collection error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Delete collection
+   */
+  ipcMain.handle('umsl-delete-collection', async (_, name: string) => {
+    try {
+      if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'Collection name must be a non-empty string' };
+      }
+
+      const result = await chromaService.deleteCollection(name.trim());
+      
+      return result;
+    } catch (error: any) {
+      safeError('❌ umsl-delete-collection error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Backward compatibility handlers
+  ipcMain.handle('umsl-retrieve-context', async (_, query: string, options: any = {}) => {
+    try {
+      const results = await unifiedMemoryManager.semanticSearch(query, options);
+      return { 
+        success: true, 
+        context: results.items.map(item => item.content).join('\n\n')
+      };
+    } catch (error: any) {
+      safeError('❌ umsl-retrieve-context error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('umsl-create-thread', async (_, message: string, metadata: any = {}) => {
+    try {
+      const threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const memoryItem: MemoryItem = {
+        id: threadId,
+        type: 'conversation',
+        content: message,
+        metadata: { ...metadata, thread_start: true },
+        timestamp: new Date().toISOString(),
+        tags: ['thread', 'conversation'],
+        priority: 'medium',
+        source: 'thread',
+        accessCount: 0
+      };
+      
+      await unifiedMemoryManager.storeMemory(memoryItem);
       
       return { success: true, threadId };
     } catch (error: any) {
@@ -134,29 +401,23 @@ export function registerMemoryHandlers(
     }
   });
 
-  /**
-   * Add message to conversation thread
-   */
   ipcMain.handle('umsl-add-to-thread', async (_, threadId: string, role: string, content: string, metadata: any = {}) => {
     try {
-      if (typeof threadId !== 'string' || !threadId.trim()) {
-        return { success: false, error: 'Thread ID must be a non-empty string' };
-      }
-
-      const validRoles = ['user', 'assistant', 'system'];
-      if (!validRoles.includes(role)) {
-        return { success: false, error: `Role must be one of: ${validRoles.join(', ')}` };
-      }
-
-      if (typeof content !== 'string' || !content.trim()) {
-        return { success: false, error: 'Content must be a non-empty string' };
-      }
-
-      const sanitizedContent = Security.sanitizeInput(content.trim());
-      const validRole = role as 'user' | 'assistant' | 'system';
+      const messageId = `msg_${threadId}_${Date.now()}`;
       
-      const semanticMemory = container.get('semanticMemory');
-      await semanticMemory.addToConversation(threadId.trim(), validRole, sanitizedContent, metadata);
+      const memoryItem: MemoryItem = {
+        id: messageId,
+        type: 'conversation',
+        content: `${role}: ${content}`,
+        metadata: { ...metadata, threadId, role },
+        timestamp: new Date().toISOString(),
+        tags: ['thread', 'message', role],
+        priority: 'medium',
+        source: 'thread',
+        accessCount: 0
+      };
+      
+      await unifiedMemoryManager.storeMemory(memoryItem);
       
       return { success: true };
     } catch (error: any) {
@@ -165,33 +426,29 @@ export function registerMemoryHandlers(
     }
   });
 
-  /**
-   * Get conversation thread
-   */
   ipcMain.handle('umsl-get-thread', async (_, threadId: string) => {
     try {
-      if (typeof threadId !== 'string' || !threadId.trim()) {
-        return { success: false, error: 'Thread ID must be a non-empty string' };
-      }
-
-      const semanticMemory = container.get('semanticMemory');
-      const thread = await semanticMemory.getConversationThread(threadId.trim());
+      const results = await unifiedMemoryManager.semanticSearch(`threadId:${threadId}`, {
+        limit: 100,
+        sortBy: 'timestamp'
+      });
       
-      return { success: true, thread };
+      return { 
+        success: true, 
+        thread: {
+          id: threadId,
+          messages: results.items
+        }
+      };
     } catch (error: any) {
       safeError('❌ umsl-get-thread error:', error);
       return { success: false, error: error.message };
     }
   });
 
-  /**
-   * Get memory statistics
-   */
   ipcMain.handle('umsl-get-memory-stats', async () => {
     try {
-      const semanticMemory = container.get('semanticMemory');
-      const stats = await semanticMemory.getMemoryStats();
-      
+      const stats = await unifiedMemoryManager.getStats();
       return { success: true, stats };
     } catch (error: any) {
       safeError('❌ umsl-get-memory-stats error:', error);
@@ -199,5 +456,5 @@ export function registerMemoryHandlers(
     }
   });
 
-  safeLog('✅ Memory handlers registered');
+  safeLog('✅ Enhanced memory handlers registered with optimization support');
 }

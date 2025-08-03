@@ -9,9 +9,18 @@ const listFilesRecursive = async (dir: string): Promise<any> => {
     dirents.map(async (dirent) => {
       const res = path.resolve(dir, dirent.name);
       if (dirent.isDirectory()) {
-        return { name: dirent.name, type: 'folder', children: await listFilesRecursive(res) };
+        return { 
+          name: dirent.name, 
+          type: 'folder', 
+          path: res,
+          children: await listFilesRecursive(res) 
+        };
       } else {
-        return { name: dirent.name, type: 'file' };
+        return { 
+          name: dirent.name, 
+          type: 'file',
+          path: res
+        };
       }
     })
   );
@@ -107,4 +116,22 @@ ipcMain.handle('canvas:uploadFiles', async (event) => {
     });
 
     return filePaths;
+});
+
+ipcMain.handle('canvas:selectDirectory', async (event) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Select Project Directory'
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    
+    return result.filePaths[0];
+  } catch (error) {
+    console.error('Failed to select directory:', error);
+    return null;
+  }
 });

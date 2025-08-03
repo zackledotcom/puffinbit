@@ -198,7 +198,7 @@ class ConversationThreadManager {
     this.activeThreads.set(threadId, context)
     
     // Store in unified memory
-    await this.memoryManager.store({
+    await this.memoryManager.storeMemory({
       id: context.id,
       type: 'conversation',
       content: JSON.stringify(context),
@@ -215,7 +215,7 @@ class ConversationThreadManager {
     
     if (!context) {
       // Try to load from memory
-      const stored = await this.memoryManager.retrieve(`context_${threadId}`)
+      const stored = await this.memoryManager.retrieveMemory(`context_${threadId}`)
       if (stored) {
         context = JSON.parse(stored.content)
         this.activeThreads.set(threadId, context!)
@@ -244,7 +244,7 @@ class ConversationThreadManager {
     }
 
     // Update in memory
-    await this.memoryManager.store({
+    await this.memoryManager.storeMemory({
       id: context!.id,
       type: 'conversation',
       content: JSON.stringify(context),
@@ -260,7 +260,7 @@ class ConversationThreadManager {
     let context = this.activeThreads.get(threadId)
     
     if (!context) {
-      const stored = await this.memoryManager.retrieve(`context_${threadId}`)
+      const stored = await this.memoryManager.retrieveMemory(`context_${threadId}`)
       if (stored) {
         context = JSON.parse(stored.content)
         this.activeThreads.set(threadId, context!)
@@ -271,7 +271,7 @@ class ConversationThreadManager {
   }
 
   async getRecentThreads(limit: number = 10): Promise<ConversationContext[]> {
-    const results = await this.memoryManager.search('conversation', {
+    const results = await this.memoryManager.semanticSearch('conversation', {
       type: 'conversation',
       limit: limit * 2 // Get more to filter
     })
@@ -328,7 +328,7 @@ export class SemanticMemoryEngine {
       tags: [type, ...enrichedMetadata.topics]
     }
 
-    await this.memoryManager.store(memoryItem)
+    await this.memoryManager.storeMemory(memoryItem)
     await this.updateKnowledgeGraph(memoryItem)
 
     return id
@@ -349,7 +349,7 @@ export class SemanticMemoryEngine {
     } = options
 
     // Primary semantic search
-    const searchResults = await this.memoryManager.search(query, {
+    const searchResults = await this.memoryManager.semanticSearch(query, {
       limit: 20,
       threshold: relevanceThreshold
     })
@@ -367,7 +367,7 @@ export class SemanticMemoryEngine {
       const focusEntities = [...entityFocus, ...entities]
       
       for (const entity of focusEntities) {
-        const entitySearch = await this.memoryManager.search(entity, {
+        const entitySearch = await this.memoryManager.semanticSearch(entity, {
           limit: 5,
           threshold: 0.6
         })
@@ -440,7 +440,7 @@ export class SemanticMemoryEngine {
     sentiment?: 'positive' | 'negative' | 'neutral'
     limit?: number
   } = {}): Promise<MemoryItem[]> {
-    const baseResults = await this.memoryManager.search(query, {
+    const baseResults = await this.memoryManager.semanticSearch(query, {
       limit: filters.limit || 50,
       type: filters.types?.[0] // Basic type filter
     })
@@ -567,7 +567,7 @@ export class SemanticMemoryEngine {
           // Find connected entities
           for (const connection of node.connections) {
             if (connection.strength > 0.6) {
-              const relatedSearch = await this.memoryManager.search(connection.nodeId, { limit: 2 })
+              const relatedSearch = await this.memoryManager.semanticSearch(connection.nodeId, { limit: 2 })
               related.push(...relatedSearch.items)
             }
           }
@@ -622,7 +622,7 @@ export class SemanticMemoryEngine {
   private async loadKnowledgeGraph(): Promise<void> {
     // Load existing knowledge graph from storage
     try {
-      const stored = await this.memoryManager.retrieve('knowledge_graph')
+      const stored = await this.memoryManager.retrieveMemory('knowledge_graph')
       if (stored) {
         const graphData = JSON.parse(stored.content)
         this.knowledgeGraph = new Map(Object.entries(graphData))
@@ -634,7 +634,7 @@ export class SemanticMemoryEngine {
 
   async saveKnowledgeGraph(): Promise<void> {
     const graphData = Object.fromEntries(this.knowledgeGraph)
-    await this.memoryManager.store({
+    await this.memoryManager.storeMemory({
       id: 'knowledge_graph',
       type: 'agent_state',
       content: JSON.stringify(graphData),

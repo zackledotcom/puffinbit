@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useCanvasStore } from '@/stores/canvasStore'
+import { memoryService } from '@/services/memoryService'
 
 interface OptimizedInputBarProps {
   value: string
@@ -190,8 +191,9 @@ export default function OptimizedInputBar({
       // Search for relevant memory
       setShowMemorySearch(true)
       try {
-        // This would integrate with the actual memory service
-        const relevantMemories = await window.api.searchMemory(value || 'recent context', 3)
+        // Integrate with memoryService (service layer)
+        // Import memoryService at the top: import { memoryService } from '@/services/memoryService'
+        const relevantMemories = await memoryService.searchMemory(value || 'recent context', 3)
         if (relevantMemories.success && relevantMemories.results) {
           onMemorySelect(relevantMemories.results)
         }
@@ -275,7 +277,7 @@ export default function OptimizedInputBar({
     }
   }, [value])
 
-  const relevantTools = getRelevantTools()
+  // No need to declare relevantTools here; call getRelevantTools() directly in render
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -338,9 +340,9 @@ export default function OptimizedInputBar({
           onDrop={handleDrop}
         >
           {/* Contextual tools */}
-          {relevantTools.length > 0 && (
+          {getRelevantTools().length > 0 && (
             <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
-              {relevantTools.map((tool) => (
+              {getRelevantTools().map((tool) => (
                 <Button
                   key={tool.id}
                   size="sm"
@@ -360,7 +362,7 @@ export default function OptimizedInputBar({
               ))}
               
               {/* Smart suggestions */}
-              {containsCode(value) && !relevantTools.find(t => t.id === 'canvas') && (
+              {containsCode(value) && !getRelevantTools().find(t => t.id === 'canvas') && (
                 <Badge variant="secondary" className="text-xs">
                   💡 Code detected - Canvas available
                 </Badge>

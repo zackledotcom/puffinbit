@@ -1,398 +1,635 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  X,
-  FolderOpen,
-  File,
-  Plus,
-  MoreHorizontal,
-  ChevronRight,
-  ChevronDown,
-  FileText,
-  Code,
-  Image,
-  Folder,
-  Upload,
-  Download,
-  Trash,
-  Edit,
-  Save,
-  Play
-} from 'phosphor-react'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+// src/renderer/src/components/canvas/CanvasPanel.tsx
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { useCanvasModeStore } from '@/stores/useCanvasModeStore'
 import { useCanvasStore } from '@/stores/canvasStore'
+import { useMessageStore } from '@/stores/useMessageStore'
 import MonacoCanvasEditor from './MonacoCanvasEditor'
+import ChatMessageList from '../chat/components/ChatMessageList'
+import InputBar from '../chat/InputBar'
+import { 
+  Code2, 
+  MessageSquare, 
+  Save, 
+  Undo2, 
+  Redo2, 
+  FileText, 
+  Folder, 
+  Play, 
+  Eye, 
+  EyeOff,
+  Settings,
+  ArrowLeft,
+  Lock,
+  Unlock
+} from 'lucide-react'
+import { detectCodeInMessage, shouldSuggestCanvas } from '@/utils/codeDetection'
 
-interface FileNode {
+interface CanvasMode {
+  type: 'scratchpad' | 'project'
+  projectPath?: string
+  files: CanvasFile[]
+  activeFileId?: string
+}
+
+interface CanvasFile {
+  id: string
   name: string
-  type: 'file' | 'folder'
-  path: string
-  children?: FileNode[]
+  content: string
+  language: string
+  modified: boolean
+  path?: string // undefined for scratchpad files
+  created: Date
+  lastModified: Date
+}
+
+interface EditAction {
+  id: string
+  type: 'create' | 'edit' | 'delete' | 'rename'
+  fileId: string
+  timestamp: Date
+  before?: any
+  after?: any
+  description: string
 }
 
 interface CanvasPanelProps {
   className?: string
 }
 
-const FileIcon = ({ fileName, type }: { fileName: string; type: 'file' | 'folder' }) => {
-  if (type === 'folder') return <Folder size={16} className="text-blue-500" />
+const CanvasPanel: React.FC<CanvasPanelProps> = ({ className }) => {
+  // State management
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>({
+    type: 'scratchpad',
+    files: [],
+    activeFileId: undefined
+  })
   
-  const ext = fileName.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-    case 'js':
-    case 'jsx':
-      return <Code size={16} className="text-yellow-500" />
-    case 'json':
-      return <FileText size={16} className="text-green-500" />
-    case 'md':
-      return <FileText size={16} className="text-blue-500" />
-    case 'py':
-      return <Code size={16} className="text-blue-600" />
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'gif':
-    case 'svg':
-      return <Image size={16} className="text-purple-500" />
-    default:
-      return <File size={16} className="text-gray-500" />
-  }
-}
+  const [editHistory, setEditHistory] = useState<EditAction[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [showChat, setShowChat] = useState(true)
+  const [autoSave, setAutoSave] = useState(true)
+  
+  // Refs for Monaco integration
+  const editorRef = useRef<any>(null)
+  const chatRef = useRef<any>(null)
 
-const FileTreeNode = ({ node, level = 0 }: { node: FileNode; level?: number }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const { currentFile, setCurrentFile, setLoading } = useCanvasStore()
+  // Global canvas mode store
+  const { setCanvasMode: setGlobalCanvasMode } = useCanvasModeStore()
+  const canvasStore = useCanvasStore()
   
-  const handleFileClick = async (filePath: string) => {
-    if (node.type === 'file') {
-      setLoading(true)
-      try {
-        const content = await window.electronAPI?.canvas?.readFile(filePath)
-        const language = getLanguageFromExtension(filePath)
-        setCurrentFile({
-          path: filePath,
-          content: content || '',
-          language
-        })
-      } catch (error) {
-        console.error('Failed to read file:', error)
-      } finally {
-        setLoading(false)
+  // Message store integration
+  const { messages, addMessage, isStreaming, sendMessage } = useMessageStore()
+  const [inputValue, setInputValue] = useState('')
+
+  // Initialize canvas mode
+  useEffect(() => {
+    setGlobalCanvasMode(true)
+    return () => setGlobalCanvasMode(false)
+  }, [setGlobalCanvasMode])
+
+  // Security validation for all operations
+  const validateCanvasOperation = useCallback((operation: string, data: any) => {
+    // Implement comprehensive security checks
+    if (canvasMode.type === 'project' && !data.path?.startsWith(canvasMode.projectPath || '')) {
+      throw new Error('Security violation: Path outside project directory')
+    }
+    
+    // Log all operations for security audit
+    console.log(`🔒 Canvas Security Log: ${operation}`, {
+      mode: canvasMode.type,
+      timestamp: new Date().toISOString(),
+      operation,
+      data: { ...data, content: data.content ? '[CONTENT]' : undefined }
+    })
+    
+    return true
+  }, [canvasMode])
+
+  // Safe, reversible edit actions with logging
+  const executeEditAction = useCallback((action: Omit<EditAction, 'id' | 'timestamp'>) => {
+    try {
+      validateCanvasOperation(action.type, action)
+      
+      const editAction: EditAction = {
+        ...action,
+        id: `edit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date()
       }
-    } else {
-      setIsExpanded(!isExpanded)
+      
+      // Apply the action
+      switch (action.type) {
+        case 'create':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: [...prev.files, action.after],
+            activeFileId: action.after.id
+          }))
+          break
+          
+        case 'edit':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.map(f => 
+              f.id === action.fileId 
+                ? { ...f, ...action.after, lastModified: new Date() }
+                : f
+            )
+          }))
+          break
+          
+        case 'delete':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.filter(f => f.id !== action.fileId),
+            activeFileId: prev.activeFileId === action.fileId ? undefined : prev.activeFileId
+          }))
+          break
+      }
+      
+      // Update edit history (truncate if we're not at the end)
+      setEditHistory(prev => {
+        const newHistory = prev.slice(0, historyIndex + 1)
+        return [...newHistory, editAction]
+      })
+      setHistoryIndex(prev => prev + 1)
+      
+      console.log(`✅ Edit action executed: ${action.description}`)
+      
+    } catch (error) {
+      console.error('❌ Canvas edit action failed:', error)
+      throw error
     }
-  }
-  
-  const getLanguageFromExtension = (filePath: string): string => {
-    const ext = filePath.split('.').pop()?.toLowerCase()
-    switch (ext) {
-      case 'ts': return 'typescript'
-      case 'tsx': return 'typescript'
-      case 'js': return 'javascript'
-      case 'jsx': return 'javascript'
-      case 'json': return 'json'
-      case 'md': return 'markdown'
-      case 'py': return 'python'
-      case 'css': return 'css'
-      case 'html': return 'html'
-      default: return 'plaintext'
+  }, [validateCanvasOperation, historyIndex])
+
+  // Undo functionality
+  const undo = useCallback(() => {
+    if (historyIndex >= 0) {
+      const action = editHistory[historyIndex]
+      
+      // Reverse the action
+      switch (action.type) {
+        case 'create':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.filter(f => f.id !== action.fileId),
+            activeFileId: prev.activeFileId === action.fileId ? undefined : prev.activeFileId
+          }))
+          break
+          
+        case 'edit':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.map(f => 
+              f.id === action.fileId && action.before
+                ? { ...f, ...action.before }
+                : f
+            )
+          }))
+          break
+          
+        case 'delete':
+          if (action.before) {
+            setCanvasMode(prev => ({
+              ...prev,
+              files: [...prev.files, action.before]
+            }))
+          }
+          break
+      }
+      
+      setHistoryIndex(prev => prev - 1)
+      console.log(`↶ Undid: ${action.description}`)
     }
-  }
-  
-  const isSelected = currentFile?.path === node.path
-  
+  }, [editHistory, historyIndex])
+
+  // Redo functionality  
+  const redo = useCallback(() => {
+    if (historyIndex < editHistory.length - 1) {
+      const nextIndex = historyIndex + 1
+      const action = editHistory[nextIndex]
+      
+      // Re-apply the action
+      switch (action.type) {
+        case 'create':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: [...prev.files, action.after],
+            activeFileId: action.after.id
+          }))
+          break
+          
+        case 'edit':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.map(f => 
+              f.id === action.fileId 
+                ? { ...f, ...action.after, lastModified: new Date() }
+                : f
+            )
+          }))
+          break
+          
+        case 'delete':
+          setCanvasMode(prev => ({
+            ...prev,
+            files: prev.files.filter(f => f.id !== action.fileId)
+          }))
+          break
+      }
+      
+      setHistoryIndex(nextIndex)
+      console.log(`↷ Redid: ${action.description}`)
+    }
+  }, [editHistory, historyIndex])
+
+  // Bidirectional chat-canvas integration
+  const analyzeMessageForCode = useCallback((message: string) => {
+    const detectedCode = detectCodeInMessage(message)
+    
+    if (detectedCode.length > 0 && shouldSuggestCanvas(message)) {
+      // Auto-create canvas file from detected code
+      const bestCode = detectedCode[0]
+      const newFile: CanvasFile = {
+        id: `file_${Date.now()}`,
+        name: `generated.${bestCode.language === 'typescript' ? 'tsx' : bestCode.language}`,
+        content: bestCode.code,
+        language: bestCode.language,
+        modified: false,
+        created: new Date(),
+        lastModified: new Date()
+      }
+      
+      executeEditAction({
+        type: 'create',
+        fileId: newFile.id,
+        after: newFile,
+        description: `Auto-created file from chat: ${bestCode.language}`
+      })
+      
+      // Add AI suggestion to chat
+      setChatMessages(prev => [...prev, {
+        id: `ai_${Date.now()}`,
+        type: 'ai',
+        content: `I detected ${bestCode.language} code in your message and created a new file. You can edit it in the Canvas!`,
+        timestamp: new Date(),
+        metadata: { trigger: 'code_detection', confidence: bestCode.confidence }
+      }])
+    }
+  }, [executeEditAction])
+
+  // Handle chat messages with Canvas integration
+  const handleChatMessage = useCallback((content: string) => {
+    const userMessage = {
+      id: `user_${Date.now()}`,
+      type: 'user',
+      content,
+      timestamp: new Date()
+    }
+    
+    setChatMessages(prev => [...prev, userMessage])
+    
+    // Analyze for code and auto-suggest Canvas
+    analyzeMessageForCode(content)
+    
+    // TODO: Send to AI service with Canvas context
+    setIsLoading(true)
+    setTimeout(() => {
+      const aiResponse = {
+        id: `ai_${Date.now()}`,
+        type: 'ai', 
+        content: `I understand you want help with: "${content}". ${canvasMode.files.length > 0 ? 'I can see your Canvas files and will incorporate them in my response.' : ''}`,
+        timestamp: new Date(),
+        canvasContext: canvasMode.files.map(f => ({ name: f.name, language: f.language }))
+      }
+      setChatMessages(prev => [...prev, aiResponse])
+      setIsLoading(false)
+    }, 1000)
+  }, [analyzeMessageForCode, canvasMode.files])
+
+  // File operations
+  const createNewFile = useCallback((name?: string, content?: string) => {
+    const fileName = name || `untitled.tsx`
+    const newFile: CanvasFile = {
+      id: `file_${Date.now()}`,
+      name: fileName,
+      content: content || `// New ${canvasMode.type} file\n\n`,
+      language: fileName.split('.').pop() || 'typescript',
+      modified: false,
+      path: canvasMode.type === 'project' ? `${canvasMode.projectPath}/${fileName}` : undefined,
+      created: new Date(),
+      lastModified: new Date()
+    }
+    
+    executeEditAction({
+      type: 'create',
+      fileId: newFile.id,
+      after: newFile,
+      description: `Created new file: ${fileName}`
+    })
+  }, [canvasMode, executeEditAction])
+
+  const handleFileContentChange = useCallback((content: string) => {
+    const activeFile = canvasMode.files.find(f => f.id === canvasMode.activeFileId)
+    if (!activeFile) return
+    
+    const before = { ...activeFile }
+    const after = { ...activeFile, content, modified: true, lastModified: new Date() }
+    
+    executeEditAction({
+      type: 'edit',
+      fileId: activeFile.id,
+      before,
+      after,
+      description: `Edited ${activeFile.name}`
+    })
+    
+    // Auto-save if enabled
+    if (autoSave && canvasMode.type === 'project' && activeFile.path) {
+      saveFile(activeFile.id)
+    }
+  }, [canvasMode, executeEditAction, autoSave])
+
+  // Save to real file system (project mode only)
+  const saveFile = useCallback(async (fileId: string) => {
+    const file = canvasMode.files.find(f => f.id === fileId)
+    if (!file || canvasMode.type === 'scratchpad') return
+    
+    try {
+      if (file.path && window.electronAPI?.writeFile) {
+        await window.electronAPI.writeFile(file.path, file.content)
+        
+        // Mark as saved
+        setCanvasMode(prev => ({
+          ...prev,
+          files: prev.files.map(f => 
+            f.id === fileId ? { ...f, modified: false } : f
+          )
+        }))
+        
+        console.log(`💾 Saved file: ${file.name}`)
+      }
+    } catch (error) {
+      console.error('❌ Failed to save file:', error)
+    }
+  }, [canvasMode])
+
+  // Switch between scratchpad and project modes
+  const switchMode = useCallback((newType: 'scratchpad' | 'project', projectPath?: string) => {
+    validateCanvasOperation('mode_switch', { newType, projectPath })
+    
+    setCanvasMode(prev => ({
+      type: newType,
+      projectPath,
+      files: newType === 'scratchpad' ? [] : prev.files, // Clear files when switching to scratchpad
+      activeFileId: undefined
+    }))
+    
+    console.log(`🔄 Switched to ${newType} mode`)
+  }, [validateCanvasOperation])
+
+  // Get active file
+  const activeFile = canvasMode.files.find(f => f.id === canvasMode.activeFileId)
+
+  // Chat handlers
+  const handleSendMessage = useCallback(async (message: string, attachments?: File[]) => {
+    if (!message.trim()) return
+    
+    setInputValue('')
+    await sendMessage({
+      content: message,
+      model: 'llama3.1', // Default model, could be made configurable
+      files: attachments,
+      memoryEnabled: true
+    })
+  }, [sendMessage])
+
+  const handleMessageCorrection = useCallback((messageId: string, newContent: string) => {
+    // TODO: Implement message correction functionality
+    console.log('Correcting message:', messageId, newContent)
+  }, [])
+
+  const handleMessageReaction = useCallback((messageId: string, reaction: string) => {
+    // TODO: Implement message reaction functionality
+    console.log('Reacting to message:', messageId, reaction)
+  }, [])
+
   return (
-    <div>
-      <div
-        className={cn(
-          "flex items-center gap-2 px-2 py-1 hover:bg-accent/50 cursor-pointer rounded-sm transition-colors",
-          isSelected && "bg-accent text-accent-foreground",
-          "group"
-        )}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
-        onClick={() => handleFileClick(node.path)}
-      >
-        {node.type === 'folder' && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsExpanded(!isExpanded)
-            }}
-            className="p-0.5 hover:bg-accent rounded"
+    <div className={cn('h-full flex flex-col bg-[#1A1A1A] text-white', className)}>
+      {/* Canvas Header - Mode controls */}
+      <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setGlobalCanvasMode(false)}
+            className="gap-2"
           >
-            {isExpanded ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
+            <ArrowLeft className="w-4 h-4" />
+            Exit Canvas
+          </Button>
+          
+          <Separator orientation="vertical" className="h-6" />
+          
+          <div className="flex items-center gap-2">
+            <Badge variant={canvasMode.type === 'scratchpad' ? 'default' : 'secondary'}>
+              {canvasMode.type === 'scratchpad' ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
+              {canvasMode.type === 'scratchpad' ? 'Scratchpad' : 'Project'}
+            </Badge>
+            
+            {canvasMode.projectPath && (
+              <span className="text-sm text-white/60">
+                {canvasMode.projectPath}
+              </span>
             )}
-          </button>
-        )}
+          </div>
+        </div>
         
-        <FileIcon fileName={node.name} type={node.type} />
-        
-        <span className="text-sm truncate flex-1">{node.name}</span>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <div className="flex items-center gap-2">
+          {/* Edit controls */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={historyIndex < 0}
+            title="Undo"
+          >
+            <Undo2 className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={redo}
+            disabled={historyIndex >= editHistory.length - 1}
+            title="Redo"
+          >
+            <Redo2 className="w-4 h-4" />
+          </Button>
+          
+          <Separator orientation="vertical" className="h-6" />
+          
+          {/* File controls */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => createNewFile()}
+            title="New File"
+          >
+            <FileText className="w-4 h-4" />
+          </Button>
+          
+          {activeFile && canvasMode.type === 'project' && (
             <Button
               variant="ghost"
               size="sm"
-              className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => saveFile(activeFile.id)}
+              disabled={!activeFile.modified}
+              title="Save"
             >
-              <MoreHorizontal size={12} />
+              <Save className="w-4 h-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Edit size={14} className="mr-2" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Download size={14} className="mr-2" />
-              Download
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600">
-              <Trash size={14} className="mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      
-      {node.type === 'folder' && isExpanded && node.children && (
-        <div>
-          {node.children.map((child) => (
-            <FileTreeNode
-              key={child.path}
-              node={child}
-              level={level + 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const CanvasPanel: React.FC<CanvasPanelProps> = ({ className }) => {
-  const {
-    canvasOpen,
-    setCanvasOpen,
-    fileTree,
-    setFileTree,
-    currentFile,
-    setCurrentFile,
-    currentDirectory,
-    setCurrentDirectory,
-    isLoading,
-    setLoading
-  } = useCanvasStore()
-  
-  const [newFileName, setNewFileName] = useState('')
-  const [showNewFileInput, setShowNewFileInput] = useState(false)
-  const resizeRef = useRef<HTMLDivElement>(null)
-  
-  useEffect(() => {
-    if (canvasOpen && !currentDirectory) {
-      // Load default directory or prompt user to select
-      loadDirectory()
-    }
-  }, [canvasOpen])
-  
-  const loadDirectory = async (path?: string) => {
-    setLoading(true)
-    try {
-      const dirPath = path || await selectDirectory()
-      if (dirPath) {
-        setCurrentDirectory(dirPath)
-        const files = await window.electronAPI?.canvas?.listFiles(dirPath)
-        setFileTree(files || [])
-      }
-    } catch (error) {
-      console.error('Failed to load directory:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const selectDirectory = async (): Promise<string | null> => {
-    // This would typically open a directory picker
-    // For now, return a default path
-    return '/Users' // Placeholder - implement proper directory selection
-  }
-  
-  const handleSaveFile = async () => {
-    if (!currentFile) return
-    
-    try {
-      await window.electronAPI?.canvas?.writeFile(currentFile.path, currentFile.content)
-      // Show success toast
-    } catch (error) {
-      console.error('Failed to save file:', error)
-    }
-  }
-  
-  const handleCreateFile = async () => {
-    if (!newFileName.trim() || !currentDirectory) return
-    
-    const filePath = `${currentDirectory}/${newFileName}`
-    try {
-      await window.electronAPI?.canvas?.createFile(filePath)
-      setNewFileName('')
-      setShowNewFileInput(false)
-      loadDirectory(currentDirectory) // Refresh file tree
-    } catch (error) {
-      console.error('Failed to create file:', error)
-    }
-  }
-  
-  if (!canvasOpen) return null
-  
-  return (
-    <motion.div
-      initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 400, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className={cn(
-        "flex flex-col bg-background border-l border-border h-full overflow-hidden",
-        className
-      )}
-      ref={resizeRef}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Code size={16} className="text-primary" />
-          <span className="font-medium text-sm">Canvas</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCanvasOpen(false)}
-          className="h-6 w-6 p-0"
-        >
-          <X size={14} />
-        </Button>
-      </div>
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* File Explorer */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between p-2 border-b border-border">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Explorer
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowNewFileInput(true)}
-                className="h-6 w-6 p-0"
-              >
-                <Plus size={12} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => loadDirectory()}
-                className="h-6 w-6 p-0"
-              >
-                <FolderOpen size={12} />
-              </Button>
-            </div>
-          </div>
-          
-          {showNewFileInput && (
-            <div className="p-2 border-b border-border">
-              <Input
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="filename.ext"
-                className="h-7 text-xs"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateFile()
-                  if (e.key === 'Escape') {
-                    setShowNewFileInput(false)
-                    setNewFileName('')
-                  }
-                }}
-                autoFocus
-              />
-            </div>
           )}
           
-          <ScrollArea className="flex-1">
-            <div className="p-1">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
-                </div>
-              ) : fileTree.length > 0 ? (
-                fileTree.map((node) => (
-                  <FileTreeNode key={node.path} node={node} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground text-xs">
-                  No files found
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowChat(!showChat)}
+            title={showChat ? 'Hide Chat' : 'Show Chat'}
+          >
+            {showChat ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </Button>
         </div>
-        
-        {/* Editor */}
-        {currentFile && (
-          <div className="flex-1 flex flex-col min-h-0 border-t border-border">
-            <div className="flex items-center justify-between p-2 bg-muted/30">
-              <div className="flex items-center gap-2">
-                <FileIcon fileName={currentFile.path.split('/').pop() || ''} type="file" />
-                <span className="text-xs font-medium truncate">
-                  {currentFile.path.split('/').pop()}
-                </span>
-              </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSaveFile}
-                  className="h-6 w-6 p-0"
-                >
-                  <Save size={12} />
-                </Button>
-              </div>
+      </div>
+
+      {/* Canvas Main Area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Chat Panel (left side) */}
+        {showChat && (
+          <div className="w-1/2 flex flex-col border-r border-white/10">
+            <div className="flex items-center gap-2 p-3 border-b border-white/10 bg-[#303030]/30">
+              <MessageSquare className="w-4 h-4" />
+              <span className="font-medium">Chat</span>
+              <Badge variant="outline" className="ml-auto border-white/20 text-white/70">
+                {chatMessages.length} messages
+              </Badge>
             </div>
             
-            <div className="flex-1 min-h-0">
-              <MonacoCanvasEditor
-                filename={currentFile.path.split('/').pop() || ''}
-                content={currentFile.content}
-                onContentChange={(content) => 
-                  setCurrentFile({ ...currentFile, content })
-                }
-                height="100%"
-                theme="auto"
+            <div className="flex-1 overflow-hidden">
+              <ChatMessageList
+                messages={messages}
+                onMessageCorrection={handleMessageCorrection}
+                onMessageReaction={handleMessageReaction}
+                isThinking={isStreaming}
+              />
+            </div>
+            
+            <div className="p-3 border-t border-white/10">
+              <InputBar
+                value={inputValue}
+                onChange={setInputValue}
+                onSend={handleSendMessage}
+                isLoading={isStreaming}
+                placeholder="Ask about your code..."
+                className="bg-[#303030]"
               />
             </div>
           </div>
         )}
+        
+        {/* Editor Panel (right side) */}
+        <div className={cn('flex flex-col', showChat ? 'w-1/2' : 'w-full')}>
+          {/* File tabs */}
+          {canvasMode.files.length > 0 && (
+            <div className="flex items-center gap-1 p-2 border-b border-white/10 bg-[#303030]/20 overflow-x-auto">
+              {canvasMode.files.map(file => (
+                <Button
+                  key={file.id}
+                  variant={file.id === canvasMode.activeFileId ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCanvasMode(prev => ({ ...prev, activeFileId: file.id }))}
+                  className="gap-2 min-w-fit"
+                >
+                  <span>{file.name}</span>
+                  {file.modified && <span className="text-[#93b3f3]">•</span>}
+                </Button>
+              ))}
+            </div>
+          )}
+          
+          {/* Editor area */}
+          <div className="flex-1">
+            {activeFile ? (
+              <MonacoCanvasEditor
+                filename={activeFile.name}
+                content={activeFile.content}
+                onContentChange={handleFileContentChange}
+                height="100%"
+                theme="vs-dark"
+                minimap={true}
+                readOnly={false}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-white/60">
+                <div className="text-center space-y-4">
+                  <Code2 className="w-12 h-12 mx-auto opacity-50" />
+                  <div>
+                    <h3 className="font-medium mb-2 text-white">
+                      {canvasMode.type === 'scratchpad' ? 'Scratchpad Mode' : 'Project Mode'}
+                    </h3>
+                    <p className="text-sm mb-4">
+                      {canvasMode.type === 'scratchpad' 
+                        ? 'Create ephemeral files for quick experiments'
+                        : 'Work with real project files'
+                      }
+                    </p>
+                    <Button onClick={() => createNewFile()} className="gap-2 bg-[#93b3f3] hover:bg-[#7da3f3] text-black">
+                      <FileText className="w-4 h-4" />
+                      Create New File
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </motion.div>
+      
+      {/* Canvas Status Bar */}
+      <div className="flex items-center justify-between p-2 text-xs text-white/60 border-t border-white/10 bg-[#303030]/10">
+        <div className="flex items-center gap-4">
+          <span>
+            Mode: {canvasMode.type} | Files: {canvasMode.files.length} | 
+            History: {editHistory.length} | Index: {historyIndex + 1}
+          </span>
+          
+          {activeFile && (
+            <span>
+              {activeFile.name} ({activeFile.language}) 
+              {activeFile.modified && ' • Modified'}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => switchMode(canvasMode.type === 'scratchpad' ? 'project' : 'scratchpad')}
+            className="text-xs h-6"
+          >
+            Switch to {canvasMode.type === 'scratchpad' ? 'Project' : 'Scratchpad'}
+          </Button>
+          
+          <span>Auto-save: {autoSave ? 'On' : 'Off'}</span>
+        </div>
+      </div>
+    </div>
   )
 }
 

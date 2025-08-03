@@ -1,0 +1,56 @@
+/* Import Algolia Autocomplete CSS */
+@import '@algolia/autocomplete-theme-classic/dist/theme.css';
+
+/* Custom predictive text styling */
+.predictive-suggestion {
+  background: #333;
+  color: #e5e5e5;
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.predictive-suggestion:hover {
+  background: #404040;
+  border-color: #93b3f3;
+}
+
+.predictive-suggestion.active {
+  background: #93b3f3;
+  color: white;
+}
+
+.predictive-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.predictive-empty {
+  padding: 12px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Hide default Algolia autocomplete when we're using it for backend processing */
+#hidden-autocomplete {
+  display: none !important;
+}
+
+/* Ensure our custom predictive UI looks good */
+.input-with-predictions {
+  position: relative;
+}

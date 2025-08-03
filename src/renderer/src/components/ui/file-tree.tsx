@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { ChevronRight, File as FileIcon, Folder as FolderIcon } from 'phosphor-react'
+import { CaretRight, File as FileIcon, Folder as FolderIcon } from 'phosphor-react'
 import { createContext, forwardRef, useCallback, useContext, useEffect, useState } from 'react'
 
 interface TreeViewElement {
@@ -259,7 +259,7 @@ const Folder = forwardRef<HTMLDivElement, FolderProps>(
         >
           {isOpen ? (
             openIcon ?? (
-              <ChevronRight
+              <CaretRight
                 className={cn(
                   'h-4 w-4 shrink-0 text-accent-foreground/50 transition-transform duration-200',
                   isOpen && 'rotate-90'
@@ -268,7 +268,7 @@ const Folder = forwardRef<HTMLDivElement, FolderProps>(
             )
           ) : (
             closeIcon ?? (
-              <ChevronRight
+              <CaretRight
                 className={cn(
                   'h-4 w-4 shrink-0 text-accent-foreground/50 transition-transform duration-200',
                   isOpen && 'rotate-90'

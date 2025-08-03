@@ -411,7 +411,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
             <Button
               onClick={newChat}
               disabled={isCreatingChat}
-              className="w-full h-10 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
+              className="w-full h-12 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
             >
               {isCreatingChat ? (
                 <div className="flex items-center gap-2">
@@ -455,10 +455,10 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                             <span className="text-white text-sm font-bold">AI</span>
                           </div>
                           <div className="flex flex-col min-w-0 flex-1">
-                            <span className="font-semibold text-gray-900 truncate">
+                            <span className="font-semibold text-gray-900 truncate tracking-tight">
                               {currentModel.displayName || currentModel.name}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 mt-0.5">
                               {currentModel.size || 'Available'}
                             </span>
                           </div>

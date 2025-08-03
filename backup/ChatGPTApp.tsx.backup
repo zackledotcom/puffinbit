@@ -1,0 +1,259 @@
+// src/renderer/src/ChatGPTApp.tsx - DESKTOP LITE VIEW
+import React, { useState, useEffect, useRef } from 'react'
+import { Send, Plus, Settings, ChevronDown, Mic, ArrowUp, Volleyball, Crown, Wrench } from 'lucide-react'
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  isVerified?: boolean
+  title?: string
+}
+
+interface ChatGPTAppProps {
+  selectedModel?: string
+  className?: string
+}
+
+const ChatGPTApp: React.FC<ChatGPTAppProps> = ({ 
+  selectedModel = 'llama3.2:latest',
+  className = ''
+}) => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: `Your system is heavy-duty, but not bloated. It's extensible, high-performance, and maintains feature isolation.
+
+You don't need to "start fresh." You just need to:
+
+• 🔍 Periodically audit dead files/components
+• ✂️ Tree-shake legacy overlays (which you already asked me to remove)  
+• 📊 Optimize render boundaries (which MessageComponent now does)
+
+Would you like me to produce a "Slim Mode" build config that disables unused tools in production? That could give you a leaner binary for shipping while retaining all features during dev.`,
+      timestamp: new Date(),
+      isVerified: true,
+      title: 'Professional Verdict'
+    }
+  ])
+  const [inputValue, setInputValue] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Format timestamp
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    })
+  }
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'inherit'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [inputValue])
+
+  const handleSendMessage = async () => {
+    const trimmedInput = inputValue.trim()
+    if (!trimmedInput || isLoading) return
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: trimmedInput,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputValue('')
+    setIsLoading(true)
+
+    try {
+      const response = await window.api?.chatWithAI?.({
+        message: trimmedInput,
+        model: selectedModel,
+        memoryOptions: { enabled: true },
+        options: { temperature: 0.7 }
+      })
+
+      if (response?.success) {
+        setTimeout(() => {
+          const aiMessage: Message = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: response.message || 'No response generated',
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setIsLoading(false)
+        }, 800)
+      } else {
+        setIsLoading(false)
+      }
+    } catch (error) {
+      console.error('Chat error:', error)
+      setIsLoading(false)
+    } finally {
+      textareaRef.current?.focus()
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  return (
+    <div className={`h-screen bg-[#1A1A1A] text-white flex flex-col ${className}`}>
+      {/* Header */}
+      <header className="flex items-center justify-between p-3 border-b border-[rgba(255,255,255,0.1)] bg-[#1A1A1A]">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center">
+              <div className="w-5 h-5 bg-black rounded-full"></div>
+            </div>
+            <button className="w-7 h-7 rounded-full border border-[rgba(255,255,255,0.2)] flex items-center justify-center hover:bg-[#303030]">
+              <Plus size={14} className="text-[rgba(255,255,255,0.6)]" />
+            </button>
+          </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          {messages.map((message) => (
+            <div key={message.id} className="mb-8">
+              {message.role === 'user' ? (
+                <div className="flex justify-end items-start gap-3">
+                  <div className="flex flex-col items-end max-w-[80%]">
+                    <div className="bg-[#303030] rounded-2xl px-4 py-3 stream-in">
+                      <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                    </div>
+                    <div className="text-[rgba(255,255,255,0.4)] text-xs mt-1">
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-[#93b3f3] flex items-center justify-center flex-shrink-0 mt-1">
+                    <Crown size={16} className="text-white" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#93b3f3] flex items-center justify-center flex-shrink-0 mt-1">
+                    <Volleyball size={16} className="text-white" />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    {message.isVerified && message.title && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-4 h-4 bg-[#93b3f3] rounded-full flex items-center justify-center">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M4.5 6L5.5 7L7.5 5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <span className="text-white font-medium text-sm">{message.title}</span>
+                      </div>
+                    )}
+                    
+                    <div className="text-[#E5E5E5] text-sm leading-relaxed whitespace-pre-wrap font-normal stream-in">
+                      {message.content}
+                    </div>
+                    <div className="text-[rgba(255,255,255,0.4)] text-xs mt-2">
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {isLoading && (
+            <div className="flex items-start gap-3 mb-8">
+              <div className="w-8 h-8 rounded-full bg-[#93b3f3] flex items-center justify-center flex-shrink-0 mt-1 smooth-glow">
+                <Volleyball size={16} className="text-white animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <div className="h-4 bg-[rgba(255,255,255,0.1)] rounded animate-pulse"></div>
+                <div className="h-3 bg-[rgba(255,255,255,0.05)] rounded mt-2 w-3/4 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 bg-[#1A1A1A]">
+        <div className="max-w-3xl mx-auto">
+          <div className="relative bg-[#303030] rounded-[24px] border border-[rgba(255,255,255,0.1)] min-h-[120px] flex items-center shadow-sm">
+            {/* Left Side */}
+            <div className="flex items-center pl-4 pr-3">
+              <button className="p-2 hover:bg-[rgba(255,255,255,0.1)] rounded-md transition-colors">
+                <Plus size={18} className="text-white" />
+              </button>
+              <button className="flex items-center gap-2 px-3 py-2 ml-2 hover:bg-[rgba(255,255,255,0.1)] rounded-md transition-colors">
+                <Wrench size={16} className="text-white" />
+                <span className="text-white text-[14px] font-normal">Tools</span>
+              </button>
+            </div>
+            
+            {/* Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message Trae AI"
+              className="flex-1 bg-transparent text-white placeholder-[rgba(255,255,255,0.5)] px-3 py-4 resize-none focus:outline-none text-[16px] leading-[24px] max-h-[200px] font-normal"
+              style={{ color: '#ffffff' }}
+              rows={1}
+              disabled={isLoading}
+            />
+            
+            {/* Right Side */}
+            <div className="flex items-center pr-3 gap-2">
+              <button className="p-2 hover:bg-[rgba(255,255,255,0.1)] rounded-md transition-colors">
+                <Mic size={18} className="text-white" />
+              </button>
+              
+              <button
+                onClick={handleSendMessage}
+                disabled={isLoading || !inputValue.trim()}
+                className="w-[32px] h-[32px] bg-white text-black rounded-full hover:bg-white hover:text-[#93b3f3] flex items-center justify-center transition-all duration-200 group"
+                style={{ backgroundColor: '#ffffff', color: '#000000' }}
+              >
+                <ArrowUp size={16} strokeWidth={2} className="group-hover:text-[#93b3f3]" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="text-center mt-2">
+            <span className="text-xs text-[rgba(255,255,255,0.4)]">
+              Trae AI can make mistakes. Check important info.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ChatGPTApp

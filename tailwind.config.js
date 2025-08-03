@@ -25,7 +25,7 @@ module.exports = {
         sans: ['-apple-system', 'SF Pro Display', 'Inter', 'sans-serif'],
       },
       colors: {
-        black: 'rgb(20, 20, 20)',
+        black: 'rgb(0, 0, 0)',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

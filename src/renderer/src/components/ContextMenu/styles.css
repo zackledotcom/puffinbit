@@ -1,11 +1,13 @@
-
+/* 🎯 DARK THEME CONTEXT MENU - NO WHITE BACKGROUNDS */
 .context-menu {
   position: absolute;
-  background-color: #fff;
-  border: 1px solid #ccc;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.15);
+  background-color: #1c1c1a;  /* User specified header background */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   padding: 5px 0;
   z-index: 1000;
+  border-radius: 8px;
+  backdrop-filter: blur(14px);
 }
 
 .context-menu ul {
@@ -17,14 +19,17 @@
 .context-menu li {
   padding: 8px 12px;
   cursor: pointer;
+  color: #ffffff;  /* User specified text color */
+  font-size: 14px;
+  transition: background-color 0.2s ease;
 }
 
 .context-menu li:hover {
-  background-color: #f0f0f0;
+  background-color: #292a2a;  /* User specified input background for hover */
 }
 
 .context-menu hr {
   border: 0;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin: 5px 0;
 }

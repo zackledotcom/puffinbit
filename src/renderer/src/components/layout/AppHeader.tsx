@@ -11,6 +11,7 @@ import {
   Robot,
   CaretDown
 } from 'phosphor-react'
+import OllamaIndicator from '@/components/ui/OllamaIndicator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -109,6 +110,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
       {/* Right Section - Actions */}
       <div className="flex items-center gap-2">
+        {/* Ollama Status Indicator */}
+        <OllamaIndicator status={ollama.status} size={18} />
         {/* Agent Manager Button - Direct Access */}
         <Button
           variant="outline"

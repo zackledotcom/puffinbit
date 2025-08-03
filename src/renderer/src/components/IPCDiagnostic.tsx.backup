@@ -1,0 +1,128 @@
+// src/renderer/src/components/IPCDiagnostic.tsx
+import React, { useState, useEffect } from 'react'
+
+interface TestResult {
+  name: string
+  status: 'pending' | 'success' | 'error'
+  error?: string
+  data?: any
+}
+
+export default function IPCDiagnostic() {
+  const [results, setResults] = useState<TestResult[]>([])
+  const [testing, setTesting] = useState(false)
+
+  const tests = [
+    {
+      name: 'window.api exists',
+      test: async () => {
+        if (!window.api) throw new Error('window.api is undefined')
+        return { api: 'available', methods: Object.keys(window.api) }
+      }
+    },
+    {
+      name: 'checkOllamaStatus',
+      test: async () => {
+        if (!window.api?.checkOllamaStatus) throw new Error('Method not available')
+        return await window.api.checkOllamaStatus()
+      }
+    },
+    {
+      name: 'getOllamaModels',
+      test: async () => {
+        if (!window.api?.getOllamaModels) throw new Error('Method not available')
+        return await window.api.getOllamaModels()
+      }
+    },
+    {
+      name: 'getMemoryStats',
+      test: async () => {
+        if (!window.api?.getMemoryStats) throw new Error('Method not available')
+        return await window.api.getMemoryStats()
+      }
+    },
+    {
+      name: 'getSystemHealth',
+      test: async () => {
+        if (!window.api?.getSystemHealth) throw new Error('Method not available')
+        return await window.api.getSystemHealth()
+      }
+    }
+  ]
+
+  const runTests = async () => {
+    setTesting(true)
+    setResults([])
+
+    for (const test of tests) {
+      const result: TestResult = {
+        name: test.name,
+        status: 'pending'
+      }
+      
+      setResults(prev => [...prev, result])
+
+      try {
+        const data = await test.test()
+        result.status = 'success'
+        result.data = data
+      } catch (error) {
+        result.status = 'error'
+        result.error = error instanceof Error ? error.message : String(error)
+      }
+
+      setResults(prev => 
+        prev.map(r => r.name === test.name ? result : r)
+      )
+
+      // Small delay to see progress
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    setTesting(false)
+  }
+
+  useEffect(() => {
+    // Auto-run tests on mount
+    runTests()
+  }, [])
+
+  return (
+    <div className="fixed top-4 right-4 bg-gray-900 text-white p-4 rounded-lg shadow-lg max-w-md z-50">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">IPC Diagnostic</h3>
+        <button 
+          onClick={runTests}
+          disabled={testing}
+          className="text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {testing ? 'Testing...' : 'Retest'}
+        </button>
+      </div>
+      
+      <div className="space-y-2 text-xs">
+        {results.map((result) => (
+          <div key={result.name} className="flex items-start gap-2">
+            <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${
+              result.status === 'pending' ? 'bg-yellow-500' :
+              result.status === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`} />
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">{result.name}</div>
+              {result.status === 'error' && (
+                <div className="text-red-300 text-xs mt-1 break-words">
+                  {result.error}
+                </div>
+              )}
+              {result.status === 'success' && result.data && (
+                <div className="text-green-300 text-xs mt-1 break-words">
+                  {JSON.stringify(result.data, null, 2).slice(0, 100)}...
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

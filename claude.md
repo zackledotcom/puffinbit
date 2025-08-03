@@ -88,10 +88,6 @@ Non-critical animations
 
 Editing Guidelines
 
-Always plan before editing
-
-Touch at least two files per task unless scoped
-
 Complete functionality (no stubs, no placeholders)
 
 Prefer batching edits across related subsystems

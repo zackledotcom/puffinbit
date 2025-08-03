@@ -486,13 +486,6 @@ export class IPCSecurity extends EventEmitter {
       .trim()
       .slice(0, 10000);
   }
-
-  /**
-   * Log security event (external API)
-   */
-  logSecurityEvent(event: string, details: any): void {
-    safeWarn(`Security event: ${event}`, details);
-  }
 }
 
 // Export singleton instance

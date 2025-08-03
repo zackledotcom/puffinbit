@@ -362,7 +362,13 @@ function deduplicateCode(detected: DetectedCode[]): DetectedCode[] {
  */
 export function shouldSuggestCanvas(content: string): boolean {
   const detected = detectCodeInMessage(content)
-  return detected.length > 0 && detected.some((d) => d.confidence > 0.7)
+  console.log('🔍 Code detection analysis:', {
+    content: content.substring(0, 100) + '...',
+    detectedBlocks: detected.length,
+    confidences: detected.map(d => ({ lang: d.language, conf: d.confidence })),
+    shouldSuggest: detected.length > 0 && detected.some((d) => d.confidence > 0.5)
+  })
+  return detected.length > 0 && detected.some((d) => d.confidence > 0.5)
 }
 
 /**

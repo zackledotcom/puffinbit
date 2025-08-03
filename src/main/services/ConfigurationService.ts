@@ -201,7 +201,7 @@ export class ConfigurationService implements Service {
   ): Promise<void> {
     try {
       this.configuration[section] = {
-        ...(this.configuration[section] || {}),
+        ...(this.configuration[section] as object || {}),
         ...updates
       };
 

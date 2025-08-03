@@ -8,7 +8,10 @@ import {
   X,
   Check,
   ArrowRight,
-  Star
+  Star,
+  FolderOpen,
+  File,
+  Folder
 } from 'phosphor-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,12 +66,96 @@ const ContextSelector: React.FC<ContextSelectorProps> = ({
   const [maxTokens, setMaxTokens] = useState([2000])
   const [smartMode, setSmartMode] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
+  const [showFileBrowser, setShowFileBrowser] = useState(false)
+  const [currentPath, setCurrentPath] = useState('')
+  const [fileItems, setFileItems] = useState<any[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       loadContextItems()
+      // Initialize with user's home directory if available
+      if (!currentPath) {
+        const homePath = process.env.HOME || process.env.USERPROFILE || '/Users'
+        setCurrentPath(homePath)
+        loadFileItems(homePath)
+      }
     }
   }, [isOpen, currentMessage, searchQuery, filterSource])
+
+  const loadFileItems = async (path: string) => {
+    setLoadingFiles(true)
+    try {
+      const response = await window.api?.listDirectory?.(path)
+      if (response?.success && response.files) {
+        setFileItems(response.files)
+        setCurrentPath(path)
+      } else {
+        console.error('Failed to load directory:', response?.error)
+      }
+    } catch (error) {
+      console.error('Directory loading failed:', error)
+    } finally {
+      setLoadingFiles(false)
+    }
+  }
+
+  const addFileToContext = async (filePath: string, fileName: string) => {
+    try {
+      const fileInfo = await window.api?.getFileInfo?.(filePath)
+      if (!fileInfo?.success || !fileInfo.info?.isFile) {
+        return
+      }
+
+      // Only read text files (skip binary files)
+      const textExtensions = ['.txt', '.md', '.js', '.ts', '.jsx', '.tsx', '.py', '.css', '.html', '.json', '.xml', '.yml', '.yaml', '.sh', '.sql', '.php', '.rb', '.go', '.rs', '.c', '.cpp', '.h', '.hpp', '.java', '.kt', '.swift', '.dart', '.vue', '.svelte', '.scss', '.sass', '.less', '.conf', '.config', '.env', '.gitignore', '.dockerfile']
+      
+      if (!textExtensions.includes(fileInfo.info.extension.toLowerCase())) {
+        alert('Only text files are supported for context')
+        return
+      }
+
+      const contentResponse = await window.api?.readFile?.(filePath)
+      if (contentResponse?.success && contentResponse.content) {
+        const newContextItem: ContextItem = {
+          id: `file-${Date.now()}`,
+          content: contentResponse.content,
+          summary: `File: ${fileName} (${fileInfo.info.size} bytes)`,
+          relevance: 0.9, // High relevance for manually selected files
+          timestamp: new Date().toISOString(),
+          source: 'file',
+          tokens: estimateTokens(contentResponse.content),
+          selected: true, // Auto-select added files
+          type: 'manual'
+        }
+
+        setContextItems(prev => [...prev, newContextItem])
+        setSelectedItems(prev => new Set([...prev, newContextItem.id]))
+        setShowFileBrowser(false)
+      } else {
+        alert('Failed to read file content')
+      }
+    } catch (error) {
+      console.error('Failed to add file to context:', error)
+      alert('Failed to add file to context')
+    }
+  }
+
+  const navigateToPath = (path: string) => {
+    loadFileItems(path)
+  }
+
+  const openFileDialog = async () => {
+    try {
+      const response = await window.api?.openFileDialog?.()
+      if (response?.success && response.filePath) {
+        const fileName = response.filePath.split('/').pop() || 'unknown'
+        await addFileToContext(response.filePath, fileName)
+      }
+    } catch (error) {
+      console.error('Failed to open file dialog:', error)
+    }
+  }
 
   const loadContextItems = async () => {
     setIsSearching(true)
@@ -249,6 +336,29 @@ const ContextSelector: React.FC<ContextSelectorProps> = ({
                 <SelectItem value="web">Web</SelectItem>
               </SelectContent>
             </Select>
+            <Button 
+              onClick={() => {
+                setShowFileBrowser(true)
+                if (currentPath && fileItems.length === 0) {
+                  loadFileItems(currentPath)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <FolderOpen size={16} />
+              Browse Files
+            </Button>
+            <Button 
+              onClick={openFileDialog}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <File size={16} />
+              Quick Add File
+            </Button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -383,6 +493,100 @@ const ContextSelector: React.FC<ContextSelectorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* File Browser Modal */}
+      {showFileBrowser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-3">
+                <FolderOpen className="text-blue-600" size={24} />
+                <h3 className="text-lg font-semibold">Select Files for Context</h3>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(false)}>
+                <X size={20} />
+              </Button>
+            </div>
+
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Current path:</span>
+                <code className="bg-gray-100 px-2 py-1 rounded text-xs">{currentPath}</code>
+                {currentPath && currentPath !== '/' && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/'
+                      navigateToPath(parentPath)
+                    }}
+                  >
+                    ← Parent
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4">
+                  {loadingFiles ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p className="text-gray-600">Loading directory...</p>
+                    </div>
+                  ) : fileItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Folder className="mx-auto mb-2 text-gray-400" size={48} />
+                      <p className="text-gray-600">Empty directory</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {fileItems.map((item, index) => (
+                        <div
+                          key={index}
+                          className={cn(
+                            'flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer',
+                            item.isDirectory ? 'border-blue-200' : 'border-gray-200'
+                          )}
+                          onClick={() => {
+                            if (item.isDirectory) {
+                              navigateToPath(item.path)
+                            } else {
+                              addFileToContext(item.path, item.name)
+                            }
+                          }}
+                        >
+                          {item.isDirectory ? (
+                            <Folder className="text-blue-500" size={20} />
+                          ) : (
+                            <File className="text-gray-500" size={20} />
+                          )}
+                          <span className="flex-1 text-sm font-medium">{item.name}</span>
+                          {item.isDirectory && (
+                            <ArrowRight className="text-gray-400" size={16} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            <div className="p-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Click folders to browse, click files to add as context
+                </div>
+                <Button variant="outline" onClick={() => setShowFileBrowser(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

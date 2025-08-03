@@ -88,7 +88,7 @@ class GoogleStyleLogger {
   fatal(message: string, error?: Error, context: LogContext = {}) {
     const { traceId, requestId } = context.traceId ? context : this.generateIds()
     
-    this.logger.fatal({
+    this.logger.error({
       message,
       trace_id: traceId,
       request_id: requestId,

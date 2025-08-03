@@ -1,47 +1,6 @@
-/* 🎯 ULTRA-WHITE DESIGN SYSTEM VARIABLES */
+/* Minimal Electron base CSS - Keep original structure working */
 :root {
-  /* Ultra-White Core Backgrounds */
-  --bg-default: #FFFFFF;
-  --bg-surface-1: #FDFDFD;
-  --bg-surface-2: #FAFAFA;
-  --bg-surface-3: #F7F8FA;
-  --bg-muted: #F7F8FA;
-  
-  /* Ultra-White Borders */
-  --border-default: #EDEEF0;
-  --border-hover: #D9DADC;
-  
-  /* Ultra-White Text */
-  --text-primary: #1A1A1A;
-  --text-secondary: #63666A;
-  --text-muted: #A0A2A5;
-  
-  /* Accent Colors - Icy Cyan */
-  --accent-cyan: #7DEBFF;
-  --accent-cyan-hover: #56E1F8;
-  --glass-cyan: rgba(125, 235, 255, 0.18);
-  
-  /* Accent Colors - Infra Red */
-  --accent-red: #FF3B47;
-  --accent-red-hover: #FF1E2C;
-  --glass-red: rgba(255, 59, 71, 0.15);
-  
-  /* Glass Effects */
-  --glass-white: rgba(255, 255, 255, 0.25);
-  --glass-blur: 14px;
-  
-  /* Shadows */
-  --shadow-subtle: rgba(0, 0, 0, 0.03);
-  --shadow-medium: rgba(0, 0, 0, 0.06);
-  --shadow-strong: rgba(0, 0, 0, 0.12);
-  
-  /* Radii - 8px base system */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-
-  /* Original Electron variables */
+  /* Working Electron variables - Minimal set */
   --ev-c-white: #ffffff;
   --ev-c-white-soft: #f8f8f8;
   --ev-c-white-mute: #f2f2f2;
@@ -70,7 +29,6 @@
   --color-background: var(--ev-c-black);
   --color-background-soft: var(--ev-c-black-soft);
   --color-background-mute: var(--ev-c-black-mute);
-
   --color-text: var(--ev-c-text-1);
 }
 

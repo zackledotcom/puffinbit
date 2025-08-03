@@ -367,7 +367,7 @@ ${formattedContext.structure.keyLinks.map(link => `- [${link.text}](${link.href}
         return { success: false, error: 'Session ID must be a non-empty string' };
       }
 
-      const sanitizedSessionId = Security.sanitizeInput(sessionId.trim());
+      const sanitizedSessionId = security.sanitizeInput(sessionId.trim());
       
       return {
         success: true,
@@ -401,17 +401,17 @@ ${formattedContext.structure.keyLinks.map(link => `- [${link.text}](${link.href}
         return { success: false, error: 'Session ID must be a non-empty string' };
       }
 
-      const sanitizedSessionId = Security.sanitizeInput(sessionId.trim());
+      const sanitizedSessionId = security.sanitizeInput(sessionId.trim());
       const browserSession = session.fromPartition(`persist:browser-${sanitizedSessionId}`);
 
       // Default data types to clear - use proper Electron storage types
-      const defaultDataTypes: ("appcache" | "cookies" | "filesystem" | "indexdb" | "localstorage" | "shadercache" | "websql" | "serviceworkers" | "cachestorage")[] = 
+      const defaultDataTypes: ("cookies" | "filesystem" | "indexdb" | "localstorage" | "shadercache" | "websql" | "serviceworkers" | "cachestorage")[] = 
         ['cookies', 'localstorage', 'cachestorage', 'serviceworkers'];
       
       // Map input types to valid Electron storage types
-      const validStorageTypes = new Set(['appcache', 'cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers', 'cachestorage']);
+      const validStorageTypes = new Set(['cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers', 'cachestorage']);
       const typesToClear = dataTypes.length > 0 
-        ? dataTypes.filter(type => validStorageTypes.has(type as any)) as ("appcache" | "cookies" | "filesystem" | "indexdb" | "localstorage" | "shadercache" | "websql" | "serviceworkers" | "cachestorage")[]
+        ? dataTypes.filter(type => validStorageTypes.has(type as any)) as ("cookies" | "filesystem" | "indexdb" | "localstorage" | "shadercache" | "websql" | "serviceworkers" | "cachestorage")[]
         : defaultDataTypes;
 
       // Clear specified data types

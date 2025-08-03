@@ -161,7 +161,6 @@ export const MonacoCanvasEditor: React.FC<MonacoCanvasEditorProps> = ({
   );
 };
 
-// Export utilities for external use
-export { getEditorValue, focusEditor } from './MonacoCanvasEditor';
+// Functions getEditorValue and focusEditor are already defined above
 
 export default MonacoCanvasEditor;

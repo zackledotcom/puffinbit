@@ -43,6 +43,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import PersonalFactsSummary from './PersonalFactsSummary'
 
 interface MemoryChunk {
   id: string
@@ -85,6 +86,7 @@ const MemoryManagerPanel: React.FC<MemoryManagerPanelProps> = ({ className }) =>
   const [filteredChunks, setFilteredChunks] = useState<MemoryChunk[]>([])
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [topicFilter, setTopicFilter] = useState<string>('all')
@@ -475,7 +477,16 @@ const MemoryManagerPanel: React.FC<MemoryManagerPanelProps> = ({ className }) =>
         </Dialog>
       </div>
 
-      {/* Stats Overview */}
+      {/* Memory Organization Tabs */}
+      <Tabs defaultValue="memories" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="memories">Memory Chunks</TabsTrigger>
+          <TabsTrigger value="conversations">Conversations</TabsTrigger>
+          <TabsTrigger value="profile">What I Know About You</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="memories" className="space-y-6">
+          {/* Memory Chunks Content */}
       {memoryStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -906,6 +917,117 @@ const MemoryManagerPanel: React.FC<MemoryManagerPanelProps> = ({ className }) =>
           </DialogContent>
         </Dialog>
       )}
+        </TabsContent>
+
+        <TabsContent value="conversations" className="space-y-6">
+          {/* Conversations Management */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Conversation Threads</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (window.confirm('Clear all conversation memories? This cannot be undone.')) {
+                    try {
+                      // Clear conversation-type memories
+                      await window.api.memoryManager?.clearCache?.()
+                      loadMemoryData() // Refresh the view
+                    } catch (error) {
+                      console.error('Failed to clear conversations:', error)
+                    }
+                  }
+                }}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash size={16} className="mr-1" />
+                Clear All Conversations
+              </Button>
+            </div>
+
+            {/* Conversation List */}
+            {filteredChunks.filter(chunk => chunk.source === 'chat').length === 0 ? (
+              <div className="text-center py-12">
+                <Brain size={48} className="mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="font-medium text-muted-foreground">No conversation memories found</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Start chatting to build conversation memory
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredChunks
+                  .filter(chunk => chunk.source === 'chat')
+                  .slice(0, 10) // Show recent conversations
+                  .map((conversation) => (
+                    <Card key={conversation.id} className="hover:shadow-sm transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                {conversation.metadata.conversation_id?.slice(-8) || 'Unknown'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {formatRelativeTime(conversation.created_at)}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                              {conversation.summary}
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {conversation.topics.slice(0, 3).map((topic) => (
+                                <Badge key={topic} variant="secondary" className="text-xs">
+                                  {topic}
+                                </Badge>
+                              ))}
+                              {conversation.topics.length > 3 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  +{conversation.topics.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 ml-4">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setSelectedChunk(conversation)}
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                if (window.confirm('Delete this conversation memory? This cannot be undone.')) {
+                                  try {
+                                    // Delete specific conversation memory
+                                    handleDeleteMemory(conversation.id)
+                                  } catch (error) {
+                                    console.error('Failed to delete conversation:', error)
+                                  }
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="profile" className="space-y-6">
+          <PersonalFactsSummary />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

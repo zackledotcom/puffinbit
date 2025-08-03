@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { ChevronRight, Folder, File as FileIcon } from 'phosphor-react'
+import { CaretRight, Folder, File as FileIcon } from 'phosphor-react'
 import { TreeViewElement } from './ui/file-tree'
 import { getFileIcon } from '../utils/file-tree-utils'
 
@@ -80,7 +80,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
       >
         {isDirectory ? (
           <>
-            <ChevronRight 
+            <CaretRight 
               className={cn(
                 'h-4 w-4 mr-1 transition-transform text-gray-400',
                 expanded && 'rotate-90'

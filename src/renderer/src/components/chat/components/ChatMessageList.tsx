@@ -33,22 +33,22 @@ interface MessageBubbleProps {
 }
 
 const TypingIndicator: React.FC = () => (
-  <div className="flex items-center space-x-2 p-4">
-    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-      <Robot size={18} className="text-primary" />
+  <div className="flex items-center space-x-3 px-4 py-2">
+    <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center">
+      <Robot size={14} className="text-white/60" />
     </div>
     <div className="flex space-x-1">
-      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+      <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce" />
       <div
-        className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+        className="w-1 h-1 bg-white/40 rounded-full animate-bounce"
         style={{ animationDelay: '0.1s' }}
       />
       <div
-        className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+        className="w-1 h-1 bg-white/40 rounded-full animate-bounce"
         style={{ animationDelay: '0.2s' }}
       />
     </div>
-    <span className="text-sm text-muted-foreground">AI is thinking...</span>
+    <span className="text-xs text-white/50">thinking...</span>
   </div>
 )
 

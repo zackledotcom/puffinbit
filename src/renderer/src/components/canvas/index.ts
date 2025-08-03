@@ -7,9 +7,15 @@ export { default as CanvasPanel } from './CanvasPanel';
 // Monaco Editor Integration
 export { default as MonacoCanvasEditor } from './MonacoCanvasEditor';
 
+// Canvas Views
+export { default as CanvasView } from './CanvasView';
+export { default as CodeCanvasView } from './CodeCanvasView';
+
+// Test Component
+export { default as CanvasTest } from './CanvasTest';
+
 // Legacy Components (deprecated - use CanvasPanel instead)
 export { default as CodeCanvas } from './CodeCanvas';
-export { default as CanvasView } from './CanvasView';
 
 // Types
 export interface CanvasMessage {

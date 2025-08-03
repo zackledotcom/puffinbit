@@ -1,48 +1,107 @@
+// src/renderer/src/main.tsx - TRAE AI OPTIMIZED
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
 import './globals.css'
 import './styles/magic-ui.css'
-import './styles/chat-enhancements.css'
 
-// Assistant UI styles - DISABLED for PremiumChatInterface
-// import '@assistant-ui/styles/index.css'
-// import '@assistant-ui/styles/modal.css'
-// import '@assistant-ui/styles/markdown.css'
+console.log('🎨 Starting Trae AI Optimized...')
 
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-
-class ErrorBoundary extends React.Component {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  render() { return this.state.hasError ? <div>App Crashed</div> : this.props.children; }
-}
-
-console.log('🚀 Renderer starting...')
-
-try {
-  const container = document.getElementById('app')
-  if (!container) {
-    throw new Error('App container not found!')
+// Error boundary for development
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
   }
-  console.log('📦 Container found:', container)
 
-  const root = createRoot(container)
-  console.log('🌳 Root created, rendering App...')
+  static getDerivedStateFromError(error: Error) {
+    console.error('🚨 React Error Boundary caught error:', error)
+    return { hasError: true, error }
+  }
 
-  root.render(
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  )
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('🚨 React Error Details:', error, errorInfo)
+  }
 
-  console.log('✅ App rendered!')
-} catch (error) {
-  console.error('❌ Failed to render app:', error)
-  // Display error on screen
-  document.body.innerHTML = `
-    <div style="padding: 20px; font-family: monospace; color: red;">
-      <h1>Failed to start Puffer</h1>
-      <pre>${error}</pre>
-    </div>
-  `
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          backgroundColor: '#1A1A1A',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '32px'
+        }}>
+          <div style={{
+            backgroundColor: '#303030',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '400px',
+            textAlign: 'center'
+          }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>
+              ⚠️ Application Error
+            </h1>
+            <p style={{ fontSize: '14px', color: '#E5E5E5', marginBottom: '16px' }}>
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                backgroundColor: 'white',
+                color: 'black',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
 }
+
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('📱 DOM ready, mounting optimized React app...')
+  
+  const rootElement = document.getElementById('root')
+  if (!rootElement) {
+    console.error('❌ Root element not found!')
+    return
+  }
+
+  const root = ReactDOM.createRoot(rootElement)
+  
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  )
+  
+  console.log('✅ Optimized React app mounted successfully')
+})
+
+// Global error handlers
+window.addEventListener('error', (event) => {
+  console.error('🚨 Global error:', event.error)
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('🚨 Unhandled promise rejection:', event.reason)
+})

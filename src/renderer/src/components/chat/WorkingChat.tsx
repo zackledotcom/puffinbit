@@ -157,9 +157,9 @@ export const WorkingChat: React.FC<WorkingChatProps> = ({ selectedModel }) => {
                       AI
                     </div>
                     <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-1 h-1 bg-gray-500/60 rounded-full animate-bounce"></div>
+                      <div className="w-1 h-1 bg-gray-500/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-1 h-1 bg-gray-500/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
                   </div>
                 </div>

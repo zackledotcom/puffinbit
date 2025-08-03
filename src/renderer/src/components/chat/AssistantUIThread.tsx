@@ -311,11 +311,11 @@ const LoadingMessage: React.FC = () => (
     className="flex gap-4 justify-start w-full max-w-2xl py-4"
   >
     <div className="flex items-center space-x-1">
-      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      <div className="w-1 h-1 bg-blue-500/60 rounded-full animate-bounce"></div>
+      <div className="w-1 h-1 bg-blue-500/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+      <div className="w-1 h-1 bg-blue-500/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
     </div>
-    <span className="text-gray-500 text-sm">AI is thinking...</span>
+    <span className="text-gray-500 text-xs">thinking...</span>
   </motion.div>
 )
 

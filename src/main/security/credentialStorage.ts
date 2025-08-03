@@ -6,7 +6,7 @@
  */
 
 import * as keytar from 'keytar';
-import { randomBytes, createCipher, createDecipher } from 'crypto';
+import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { safeLog, safeError, safeWarn } from '../utils/safeLogger';
 
 // Service configuration
@@ -238,7 +238,7 @@ export class SecureCredentialStorage {
     }
 
     const iv = randomBytes(16);
-    const cipher = createCipher(ENCRYPTION_ALGORITHM, this.encryptionKey);
+    const cipher = createCipheriv(ENCRYPTION_ALGORITHM, this.encryptionKey as Buffer, iv);
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
@@ -262,7 +262,7 @@ export class SecureCredentialStorage {
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
     
-    const decipher = createDecipher(ENCRYPTION_ALGORITHM, this.encryptionKey);
+    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, this.encryptionKey as Buffer, iv);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     

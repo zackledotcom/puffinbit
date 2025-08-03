@@ -1,23 +1,102 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Electron</title>
-    <!-- Security headers -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
-    />
-    <!-- Prevent MIME-type sniffing -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <!-- Disable referrer information leakage -->
-    <meta name="referrer" content="no-referrer" />
-    <!-- Restrict powerful features -->
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
-  </head>
-
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline';" />
+  <title>Puffin AI - Desktop Lite</title>
+  <style>
+    /* Puffin loading styles with Magic UI dot pattern */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background-color: #000000;
+      color: white;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    #root {
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Magic UI inspired dot pattern - simplified */
+    .puffin-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      flex-direction: column;
+      gap: 24px;
+      background-color: #000000;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .puffin-spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid #2F2F2F;
+      border-top: 2px solid #19C37D;
+      border-radius: 50%;
+      animation: puffin-spin 1s linear infinite;
+      z-index: 10;
+    }
+    
+    @keyframes puffin-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .puffin-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      z-index: 10;
+    }
+    
+    .puffin-logo-icon {
+      width: 24px;
+      height: 24px;
+      background-color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .puffin-logo-icon::after {
+      content: '';
+      width: 16px;
+      height: 16px;
+      background-color: black;
+      border-radius: 2px;
+    }
+    
+    /* Hide scrollbars during loading */
+    ::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <!-- Puffin loading state with Magic UI dot pattern -->
+    <div class="puffin-loading">
+      <div class="puffin-logo">
+        <div class="puffin-logo-icon"></div>
+        <span style="font-size: 18px; font-weight: 500; color: white;">Puffin</span>
+      </div>
+      <div class="puffin-spinner"></div>
+      <p style="color: #B4B4B4; font-size: 14px; margin: 0; z-index: 10;">Loading Desktop Lite View...</p>
+    </div>
+  </div>
+  
+  <!-- Electron-vite will inject the script automatically -->
+  <script type="module" src="./src/main.tsx"></script>
+</body>
 </html>

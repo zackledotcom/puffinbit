@@ -33,6 +33,7 @@ export interface ChatResponse {
   responseTime?: number;
   tokenCount?: number;
   memoryUsed?: boolean;
+  memoryContext?: string[]; // Add memory context to response
   error?: string;
 }
 
@@ -118,6 +119,7 @@ class ChatProcessor {
       // Enhanced memory retrieval with proper error handling
       let enhancedPrompt = sanitizedMessage;
       let memoryUsed = false;
+      let memoryContext: string[] = [];
 
       if (request.memoryOptions?.enabled) {
         try {
@@ -131,11 +133,13 @@ class ChatProcessor {
             );
 
             if (contextResults?.primary?.length > 0) {
-              const memoryContext = contextResults.primary
+              // Store the raw memory context for the response
+              memoryContext = contextResults.primary
                 .slice(0, 5) // Limit memory results
-                .map(result => this.security.sanitizeInput(result.content))
-                .join('\n');
-              enhancedPrompt = `Context: ${memoryContext}\n\nUser: ${sanitizedMessage}`;
+                .map(result => this.security.sanitizeInput(result.content));
+                
+              const memoryContextString = memoryContext.join('\n');
+              enhancedPrompt = `Context: ${memoryContextString}\n\nUser: ${sanitizedMessage}`;
               memoryUsed = true;
               safeInfo(`Enhanced prompt with ${contextResults.primary.length} memory chunks`);
             }
@@ -208,7 +212,8 @@ class ChatProcessor {
         modelUsed: request.model,
         responseTime,
         tokenCount: result.tokenCount || 0,
-        memoryUsed
+        memoryUsed,
+        memoryContext: memoryContext.length > 0 ? memoryContext : undefined
       };
 
     } catch (error: any) {

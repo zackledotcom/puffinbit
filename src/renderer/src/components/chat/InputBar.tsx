@@ -43,11 +43,13 @@ import { Toggle } from '@/components/ui/toggle'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import ContextFileSelector from './ContextFileSelector'
+import FilePreviewModal from './FilePreviewModal'
 
 interface InputBarProps {
   value: string
   onChange: (value: string) => void
-  onSend: (message: string, attachments?: File[]) => void
+  onSend: (message: string, attachments?: File[], contextFiles?: File[]) => void
   onFileUpload?: (files: File[]) => void
   onOpenCanvas?: () => void
   onOpenTerminal?: () => void
@@ -61,8 +63,6 @@ interface InputBarProps {
   onToggleDevMode?: () => void
   terminalOutput?: string[]
   className?: string
-  onContextSelect?: (context: any[]) => void
-  selectedContext?: any[]
 }
 
 interface AttachedFile {
@@ -70,6 +70,13 @@ interface AttachedFile {
   preview?: string
   type: 'image' | 'document' | 'code' | 'csv' | 'other'
   uploadProgress?: number
+}
+
+interface ContextFile {
+  id: string
+  file: File
+  type: 'image' | 'document' | 'code' | 'csv' | 'other'
+  addedAt: Date
 }
 
 export default function InputBar({
@@ -88,16 +95,18 @@ export default function InputBar({
   devMode = false,
   onToggleDevMode,
   terminalOutput = [],
-  className,
-  onContextSelect,
-  selectedContext = []
+  className
 }: InputBarProps) {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const [contextFiles, setContextFiles] = useState<ContextFile[]>([])
+  const [selectedContextIds, setSelectedContextIds] = useState<string[]>([])
   const [dragOver, setDragOver] = useState(false)
-  const [showTools, setShowTools] = useState(false)
+  const [showTools, setShowTools] = useState(false) // Keep tools hidden but add dedicated Canvas button
   const [browseQuery, setBrowseQuery] = useState('')
   const [showBrowseDialog, setShowBrowseDialog] = useState(false)
-  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [showContextSelector, setShowContextSelector] = useState(false)
+  const [previewFile, setPreviewFile] = useState<File | null>(null)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -161,13 +170,21 @@ export default function InputBar({
 
   const handleSend = () => {
     if (value.trim() || attachedFiles.length > 0) {
+      // Get selected context files
+      const selectedContextFiles = contextFiles
+        .filter(cf => selectedContextIds.includes(cf.id))
+        .map(cf => cf.file)
+
       onSend(
         value,
-        attachedFiles.map((af) => af.file)
+        attachedFiles.map((af) => af.file),
+        selectedContextFiles
       )
       onChange('')
       setAttachedFiles([])
+      setSelectedContextIds([]) // Clear context selection after sending
       setShowTools(false)
+      setShowContextSelector(false)
     }
   }
 
@@ -202,6 +219,10 @@ export default function InputBar({
           e.preventDefault()
           onOpenCanvas?.()
           break
+        case 'l':
+          e.preventDefault()
+          setShowContextSelector(!showContextSelector)
+          break
       }
     }
   }
@@ -234,6 +255,34 @@ export default function InputBar({
 
     setAttachedFiles((prev) => [...prev, ...newFiles])
     onFileUpload?.(files)
+  }
+
+  const handleContextFileUpload = (files: File[]) => {
+    const newContextFiles = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      type: getFileType(file),
+      addedAt: new Date()
+    }))
+
+    setContextFiles((prev) => [...prev, ...newContextFiles])
+  }
+
+  const handleContextFileRemove = (fileId: string) => {
+    setContextFiles((prev) => prev.filter(cf => cf.id !== fileId))
+    setSelectedContextIds((prev) => prev.filter(id => id !== fileId))
+  }
+
+  const handleAddToContext = (file: File) => {
+    const contextFile: ContextFile = {
+      id: crypto.randomUUID(),
+      file,
+      type: getFileType(file),
+      addedAt: new Date()
+    }
+    
+    setContextFiles((prev) => [...prev, contextFile])
+    setSelectedContextIds((prev) => [...prev, contextFile.id])
   }
 
   const removeFile = (index: number) => {
@@ -348,6 +397,17 @@ export default function InputBar({
         </Card>
       )}
 
+      {/* Context File Selector */}
+      {showContextSelector && (
+        <ContextFileSelector
+          availableFiles={contextFiles}
+          selectedFileIds={selectedContextIds}
+          onSelectionChange={setSelectedContextIds}
+          onFilePreview={setPreviewFile}
+          onFileRemove={handleContextFileRemove}
+          onFileUpload={handleContextFileUpload}
+        />
+      )}
       {/* File attachments preview */}
       {attachedFiles.length > 0 && (
         <div className="space-y-2">
@@ -463,6 +523,19 @@ export default function InputBar({
 
           {/* Input area */}
           <div className="flex gap-2 items-end">
+            {/* Canvas Button - Always Visible */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2 gap-1 bg-purple-50 border-purple-200 hover:bg-purple-100 hover:border-purple-300"
+              onClick={onOpenCanvas}
+              disabled={!onOpenCanvas}
+              title="Open Canvas (Ctrl+K)"
+            >
+              <Code className="w-4 h-4 text-purple-600" />
+              <span className="text-xs font-medium text-purple-700">Canvas</span>
+            </Button>
+
             {/* Tools toggle */}
             <Toggle
               pressed={showTools}
@@ -495,15 +568,23 @@ export default function InputBar({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowContextMenu(!showContextMenu)}
+                onClick={() => setShowContextSelector(!showContextSelector)}
                 disabled={isLoading}
                 className={cn(
                   'absolute right-12 bottom-2 h-8 w-8 p-0',
-                  selectedContext.length > 0 && 'text-purple-600'
+                  (selectedContextIds.length > 0 || showContextSelector) && 'text-purple-600'
                 )}
-                title="Add context"
+                title={`Context files (${selectedContextIds.length} selected) - Ctrl+L`}
               >
                 <Lightning className="w-4 h-4" />
+                {selectedContextIds.length > 0 && (
+                  <Badge 
+                    variant="secondary" 
+                    className="absolute -top-1 -right-1 h-4 min-w-[16px] text-xs px-1"
+                  >
+                    {selectedContextIds.length}
+                  </Badge>
+                )}
               </Button>
 
               {/* Attachment button */}
@@ -514,11 +595,21 @@ export default function InputBar({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
                 className="absolute right-2 bottom-2 h-8 w-8 p-0"
-                title="Attach files"
+                title="Attach files - Ctrl+U"
               >
                 <Paperclip className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Canvas button - Always visible */}
+            <Button
+              onClick={onOpenCanvas}
+              disabled={!onOpenCanvas}
+              className="h-11 px-3 bg-purple-600 hover:bg-purple-700 text-white"
+              title="Open Canvas Mode - Ctrl+K"
+            >
+              <Code className="w-4 h-4" />
+            </Button>
 
             {/* Send/Stop button */}
             <Button
@@ -534,92 +625,28 @@ export default function InputBar({
             </Button>
           </div>
 
-          {/* Context selection menu */}
-          {showContextMenu && (
-            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Lightning className="w-4 h-4 text-purple-600" />
-                  <span className="text-sm font-medium">Context Enhancement</span>
-                  {selectedContext.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {selectedContext.length} selected
-                    </Badge>
-                  )}
+          {/* Context selection summary */}
+          {selectedContextIds.length > 0 && !showContextSelector && (
+            <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <Brain className="w-4 h-4 text-purple-600" />
+                  <span className="text-purple-700 font-medium">
+                    {selectedContextIds.length} context file{selectedContextIds.length > 1 ? 's' : ''} selected
+                  </span>
                 </div>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setShowContextMenu(false)}
-                  className="h-6 w-6 p-0"
+                  onClick={() => setShowContextSelector(true)}
+                  className="h-6 text-xs text-purple-600 hover:text-purple-700"
                 >
-                  <X className="w-3 h-3" />
+                  Edit
                 </Button>
               </div>
-
-              <div className="space-y-2">
-                <p className="text-xs text-gray-600">
-                  Add context to enhance your message with relevant information
-                </p>
-
-                {/* Quick context options */}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      // TODO: Implement context selection
-                      onContextSelect?.([
-                        { type: 'memory', content: 'Recent conversation context' }
-                      ])
-                    }}
-                    className="h-7 text-xs"
-                  >
-                    <Brain className="w-3 h-3 mr-1" />
-                    Memory Context
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      // TODO: Implement file context
-                      onContextSelect?.([{ type: 'file', content: 'Current file context' }])
-                    }}
-                    className="h-7 text-xs"
-                  >
-                    <File className="w-3 h-3 mr-1" />
-                    File Context
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      // TODO: Implement web context
-                      onContextSelect?.([{ type: 'web', content: 'Web search results' }])
-                    }}
-                    className="h-7 text-xs"
-                  >
-                    <Globe className="w-3 h-3 mr-1" />
-                    Web Context
-                  </Button>
-                </div>
-
-                {selectedContext.length > 0 && (
-                  <div className="mt-2 pt-2 border-t">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        onContextSelect?.([])
-                        setShowContextMenu(false)
-                      }}
-                      className="h-6 text-xs text-red-600 hover:text-red-700"
-                    >
-                      Clear all context
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-purple-600 mt-1">
+                Files will be included as context to enhance AI understanding
+              </p>
             </div>
           )}
         </CardContent>
@@ -679,6 +706,14 @@ export default function InputBar({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        onAddToContext={handleAddToContext}
+      />
     </div>
   )
 }
